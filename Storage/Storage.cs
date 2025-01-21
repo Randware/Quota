@@ -1,32 +1,39 @@
 namespace Store;
+using Microsoft.Data.Sqlite;
 
 public class Storage
 {
-    public Storage()
+    private const string DB_PATH = "database.db";
+    
+    private long id;
+    
+    private SqliteConnection connection;
+    
+    public Storage(long id)
     {
-
+        this.id = id;
+        
+        connection = new SqliteConnection(DB_PATH);
     }
 
-    public uint saveQuote(Quote quote)
-    {
-        throw new NotImplementedException();
-    }
-
-
-    public IList<Quote> randomQuote(uint amount = 1)
-    {
-        throw new NotImplementedException();
-    }
-
-    public IList<Quote> getQuote(string quotee)
+    public uint SaveQuote(Quote quote)
     {
         throw new NotImplementedException();
     }
 
-    public Quote getQuote(uint id)
+
+    public IList<Quote> RandomQuote(uint amount = 1)
+    {
+        throw new NotImplementedException();
+    }
+
+    public IList<Quote> GetQuote(string quotee)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Quote GetQuote(uint id)
     {
         throw new NotImplementedException();
     }
 }
-
-
