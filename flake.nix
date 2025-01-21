@@ -18,7 +18,7 @@
           pkgs.zlib.dev
           pkgs.openssl
           dotnetPkg
-          pkgs.nuget
+          pkgs.gh
         ];
       in
       {
