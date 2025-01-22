@@ -10,7 +10,9 @@ public class DiscordBot
 
         var options = new JsonSerializerOptions
         {
-            WriteIndented = true // Enable pretty-printing
+            WriteIndented = true, // Enable pretty-printing
+            Converters = { new EmoteConverter(), new PermissionsConverter() }
+
         };
 
         var json = JsonSerializer.Serialize(conf, options);
