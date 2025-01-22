@@ -11,4 +11,8 @@ public readonly struct Quote
         Quotee = quotee;
     }
 
+    public override string ToString()
+    {
+        return $"text: {Text}, quotee: {Quotee}";
+    }
 }

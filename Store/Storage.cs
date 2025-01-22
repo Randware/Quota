@@ -27,7 +27,7 @@ public class Storage : IDisposable
     private void InitTable()
     {
         using SqliteCommand createTable = connection.CreateCommand();
-        
+
         createTable.CommandText = $@"
             CREATE TABLE IF NOT EXISTS {Table} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,17 +77,44 @@ public class Storage : IDisposable
         return insertID;
     }
 
-    public Quote RandomQuote()
+    public Quote? RandomQuote()
     {
-        throw new NotImplementedException();
-    }
-    
-    public IList<Quote> RandomQuote(uint amount)
-    {
-        throw new NotImplementedException();
+        List<Quote>? quote = RandomQuote(1);
+
+        if (quote == null) return null;
+
+        return quote.First();
     }
 
-    public IList<Quote> GetQuote(string quotee)
+    public List<Quote>? RandomQuote(uint amount)
+    {
+        if (amount == 0)
+        {
+            return new List<Quote>();
+        }
+
+        List<Quote> quotes = new List<Quote>();
+
+        using SqliteCommand randomCommand = connection.CreateCommand();
+
+        randomCommand.CommandText = $@"
+            SELECT text, quotee FROM {Table} ORDER BY RANDOM() LIMIT {amount};
+        ";
+
+        using SqliteDataReader reader = randomCommand.ExecuteReader();
+
+        while (reader.Read())
+        {
+            quotes.Add(new Quote(
+                reader.GetString(0),
+                reader.GetString(1)
+            ));
+        }
+
+        return quotes.Count > 0 ? quotes : null;
+    }
+
+    public List<Quote> GetQuote(string quotee)
     {
         throw new NotImplementedException();
     }
