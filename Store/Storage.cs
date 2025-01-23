@@ -23,7 +23,6 @@ public class Storage : IDisposable
         InitTable();
     }
 
-
     private void InitTable()
     {
         using SqliteCommand createTable = connection.CreateCommand();
@@ -39,6 +38,11 @@ public class Storage : IDisposable
         createTable.ExecuteNonQuery();
     }
 
+    /// <summary>
+    /// Delete all data associated with this storage instance and disconnect
+    /// from the database. This effectively renders the storage useless.
+    /// Trying to use it further, will result in errors.
+    /// </summary>
     public void Delete()
     {
         using SqliteCommand deleteCommand = connection.CreateCommand();
@@ -48,8 +52,21 @@ public class Storage : IDisposable
         ";
 
         deleteCommand.ExecuteNonQuery();
+
+        Dispose();
     }
 
+    /// <summary>
+    /// Insert a new <see cref="Quote"/> into the Storage.
+    /// </summary>
+    /// 
+    /// <param name="quote">
+    /// The <see cref="Quote"/> which will be inserted.
+    /// </param>
+    /// 
+    /// <returns>
+    /// The id of the newly inserted quote.
+    /// </returns>
     public uint SaveQuote(Quote quote)
     {
         using SqliteCommand insertCmd = connection.CreateCommand();
@@ -77,6 +94,14 @@ public class Storage : IDisposable
         return insertID;
     }
 
+    /// <summary>
+    /// Get a random <see cref="Quote"/> from the storage.
+    /// </summary>
+    /// 
+    /// <returns>
+    /// A random <see cref="Quote"/>, or null, if
+    /// there are no quotes stored in the storage.
+    /// </returns>
     public Quote? RandomQuote()
     {
         List<Quote>? quote = RandomQuote(1);
@@ -86,13 +111,22 @@ public class Storage : IDisposable
         return quote.First();
     }
 
-    public List<Quote>? RandomQuote(uint amount)
+    /// <summary>
+    /// Get a specific amount of random <see cref="Quote"/> objects from the storage.
+    /// </summary>
+    ///
+    /// <param name="amount">
+    /// The amount of random quotes to get. If there are not enough
+    /// quotes in the storage, this will simply be all quotes.
+    /// </param>
+    /// 
+    /// <returns>
+    /// A <see cref="List{T}"/> containing random <see cref="Quote"/> objects.
+    /// An empty <see cref="List{Quote}"/> if there are no quotes
+    /// stored in the storage.
+    /// </returns>
+    public List<Quote> RandomQuote(uint amount)
     {
-        if (amount == 0)
-        {
-            return new List<Quote>();
-        }
-
         List<Quote> quotes = new List<Quote>();
 
         using SqliteCommand randomCommand = connection.CreateCommand();
@@ -111,17 +145,80 @@ public class Storage : IDisposable
             ));
         }
 
-        return quotes.Count > 0 ? quotes : null;
+        return quotes;
     }
 
-    public List<Quote> GetQuote(string quotee)
+
+    /// <summary>
+    /// Get all <see cref="Quote"/> from a specific quotee.
+    /// </summary>
+    ///
+    /// <param name="quotee">
+    /// Name of the quotee to get the quotes from.
+    /// </param>
+    /// 
+    /// <returns>
+    /// A <see cref="List{T}"/> containing all <see cref="Quote"/>
+    /// objects by the provided quotee. An empty <see cref="List{Quote}"/>
+    /// if there are no quotes found.
+    /// </returns>
+    public List<Quote> GetQuotes(string quotee)
     {
-        throw new NotImplementedException();
+        List<Quote> quotes = new List<Quote>();
+
+        using SqliteCommand getCommand = connection.CreateCommand();
+
+        getCommand.CommandText = $@"
+            SELECT text, quotee FROM {Table} WHERE LOWER(quotee) = @quotee;
+        ";
+
+        getCommand.Parameters.AddWithValue("@quotee", quotee.ToLower());
+
+        using SqliteDataReader reader = getCommand.ExecuteReader();
+
+        while (reader.Read())
+        {
+            quotes.Add(new Quote(
+                reader.GetString(0),
+                reader.GetString(1)
+            ));
+        }
+
+        return quotes;
     }
 
-    public Quote GetQuote(uint id)
+    /// <summary>
+    /// Get a specific <see cref="Quote"/> by its ID.
+    /// </summary>
+    /// 
+    /// <param name="id">
+    /// The ID which to get the quote for 
+    /// </param>
+    /// 
+    /// <returns>
+    /// The <see cref="Quote"/> with the specified ID.
+    /// </returns>
+    public Quote? GetQuote(uint id)
     {
-        throw new NotImplementedException();
+        using SqliteCommand getCommand = connection.CreateCommand();
+
+        getCommand.CommandText = $@"
+            SELECT id, text, quotee FROM {Table} WHERE id == @id LIMIT 1;
+        ";
+
+        getCommand.Parameters.AddWithValue("@id", id);
+
+        using SqliteDataReader reader = getCommand.ExecuteReader();
+
+        if (reader.Read())
+        {
+            return new Quote(
+                reader.GetString(1),
+                reader.GetString(2)
+            );
+        }
+
+        return null;
     }
 
     public void Dispose()
