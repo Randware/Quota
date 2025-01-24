@@ -6,11 +6,10 @@ using System;
 public class Storage : IDisposable
 {
     private readonly long _id;
-    private Quotes _quotes;
     private SqliteConnection _connection;
 
     private string DatabasePath => $"{_id}.db";
-    public Quotes Quotes => _quotes;
+    public Quotes Quotes { get; }
 
 
     public Storage(long id)
@@ -20,7 +19,7 @@ public class Storage : IDisposable
         _connection = new SqliteConnection($"Data Source={DatabasePath}");
         _connection.Open();
 
-        _quotes = new Quotes(_connection);
+        Quotes = new Quotes(_connection);
     }
 
     public void Delete()
