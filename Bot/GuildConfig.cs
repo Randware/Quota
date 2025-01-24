@@ -11,19 +11,19 @@ public struct GuildConfig
     [JsonPropertyName("permission")]
     public Dictionary<string, List<Permissions>> Permissions { get; set; }
     [JsonPropertyName("accessManagment")]
-    public AccessManagment AccessManagment { get; set; }
+    public AccessManagement AccessManagment { get; set; }
     [JsonPropertyName("threads")]
     public Threads Threads { get; set; }
 
 
-    public GuildConfig(Emojis emojis, Dictionary<string, List<Permissions>> permissions, AccessManagment accessManagment, Threads threads)
+    public GuildConfig(Emojis emojis, Dictionary<string, List<Permissions>> permissions, AccessManagement accessManagment, Threads threads)
     {
         this.Emoji = emojis;
         this.Permissions = permissions;
         this.AccessManagment = accessManagment;
         this.Threads = threads;
     }
-    public GuildConfig() : this(new Emojis(), new Dictionary<string, List<Bot.Permissions>> { { "everyone", new List<Bot.Permissions>() { Bot.Permissions.GET } } }, new AccessManagment(), new Threads()) { }
+    public GuildConfig() : this(new Emojis(), new Dictionary<string, List<Bot.Permissions>> { { "everyone", new List<Bot.Permissions>() { Bot.Permissions.GET } } }, new AccessManagement(), new Threads()) { }
 
 }
 
@@ -85,14 +85,14 @@ internal class EmoteConverter() : JsonConverter<Discord.IEmote>
 /*}*/
 
 
-public struct AccessManagment
+public struct AccessManagement
 {
     [JsonPropertyName("allowedChannels")]
     public List<Discord.ITextChannel> AllowedChannels { get; set; }
     [JsonPropertyName("lockAllowedChannels")]
     public bool LockAllowedChannels { get; set; }
 
-    public AccessManagment(bool lockAllowedChannels, params Discord.ITextChannel[] channels)
+    public AccessManagement(bool lockAllowedChannels, params Discord.ITextChannel[] channels)
     {
         LockAllowedChannels = lockAllowedChannels;
         AllowedChannels = new();
@@ -100,7 +100,7 @@ public struct AccessManagment
 
     }
 
-    public AccessManagment() : this(false)
+    public AccessManagement() : this(false)
     {
 
     }
@@ -168,3 +168,5 @@ public class PermissionsConverter : JsonConverter<Permissions>
         writer.WriteStringValue(value.ToString().ToLower());
     }
 }
+
+
