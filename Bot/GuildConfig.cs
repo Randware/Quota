@@ -9,21 +9,21 @@ public struct GuildConfig
     [JsonPropertyName("emoji")]
     public Emojis Emoji { get; set; }
     [JsonPropertyName("permission")]
-    public Dictionary<string, List<Permissions>> Permissions { get; set; }
+    public Dictionary<string, HashSet<Permissions>> Permissions { get; set; }
     [JsonPropertyName("accessManagment")]
     public AccessManagement AccessManagment { get; set; }
     [JsonPropertyName("threads")]
     public Threads Threads { get; set; }
 
 
-    public GuildConfig(Emojis emojis, Dictionary<string, List<Permissions>> permissions, AccessManagement accessManagment, Threads threads)
+    public GuildConfig(Emojis emojis, Dictionary<string, HashSet<Permissions>> permissions, AccessManagement accessManagment, Threads threads)
     {
         this.Emoji = emojis;
         this.Permissions = permissions;
         this.AccessManagment = accessManagment;
         this.Threads = threads;
     }
-    public GuildConfig() : this(new Emojis(), new Dictionary<string, List<Bot.Permissions>> { { "everyone", new List<Bot.Permissions>() { Bot.Permissions.GET } } }, new AccessManagement(), new Threads()) { }
+    public GuildConfig() : this(new Emojis(), new Dictionary<string, HashSet<Bot.Permissions>> { { "everyone", new HashSet<Bot.Permissions>() { Bot.Permissions.GET } } }, new AccessManagement(), new Threads()) { }
 
 }
 
@@ -85,6 +85,7 @@ internal class EmoteConverter() : JsonConverter<Discord.IEmote>
 /*}*/
 
 
+// Which channels the bot is allowed to be in
 public struct AccessManagement
 {
     [JsonPropertyName("allowedChannels")]
@@ -168,5 +169,6 @@ public class PermissionsConverter : JsonConverter<Permissions>
         writer.WriteStringValue(value.ToString().ToLower());
     }
 }
+
 
 
