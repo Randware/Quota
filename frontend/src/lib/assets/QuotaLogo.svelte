@@ -1,0 +1,22 @@
+<script lang="ts">
+	export let size: string | number = 24;
+</script>
+
+<svg
+	version="1.2"
+	xmlns="http://www.w3.org/2000/svg"
+	viewBox="0 0 1000 1000"
+	width={size}
+	height={size}
+	fill="none"
+	stroke="currentColor"
+	><style>
+		.a {
+			stroke-miterlimit: 100;
+			stroke-width: 140;
+		}
+	</style><path
+		class="a"
+		d="m499.5 903.4c-223.3 0-403.9-180.6-403.9-403.9 0-223.3 180.6-403.9 403.9-403.9 223.3 0 403.9 180.6 403.9 403.9 0 223.3-180.6 403.9-403.9 403.9zm335.6-69.7l0.8-0.8 47.3 47.3-0.8 0.8z"
+	/></svg
+>

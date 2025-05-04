@@ -1,3 +1,13 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/roboto';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+
+@theme {
+	--color-primary: rgb(247, 111, 83);
+	--color-light: rgb(242, 240, 227);
+	--color-dark: rgb(32, 32, 32);
+	--color-darker: rgb(29, 29, 29);
+	--font-simple: 'Roboto', sans-serif;
+	--default-font-family: 'Roboto', sans-serif;
+}

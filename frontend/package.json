@@ -40,5 +40,9 @@
 		"onlyBuiltDependencies": [
 			"esbuild"
 		]
+	},
+	"dependencies": {
+		"@fontsource-variable/roboto": "^5.2.5",
+		"lucide-svelte": "^0.506.0"
 	}
 }
