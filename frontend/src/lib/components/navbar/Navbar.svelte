@@ -6,7 +6,7 @@
 	let { user } = $props<{ user: { name: string; picture: string } | null }>();
 </script>
 
-<header class="bg-dark flex h-20 w-full items-center gap-2 p-2">
+<header class="bg-dark flex h-18 w-full items-center gap-2 p-2 sm:h-20">
 	<a href="/" class="text-primary aspect-square h-full p-3">
 		<QuotaLogo size={'100%'} />
 	</a>
@@ -17,13 +17,11 @@
 		Quota
 	</div>
 
-	<div class="flex h-full w-full items-center p-4">
-		<div class="ms-auto flex h-full items-center">
-			{#if user}
-				<UserMenu {user} />
-			{:else}
-				<LoginButton />
-			{/if}
-		</div>
+	<div class="ms-auto flex h-full items-center">
+		{#if user}
+			<UserMenu {user} />
+		{:else}
+			<LoginButton />
+		{/if}
 	</div>
 </header>

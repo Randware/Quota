@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import type { Icon } from 'lucide-svelte';
+	import { Icon } from 'lucide-svelte';
 	import { scale } from 'svelte/transition';
 
 	let { name, icon, path } = $props<{
@@ -21,8 +21,8 @@
            hover:bg-darker p-4 transition-colors duration-300"
 	>
 		{#if true}
-			{@const IconComp = icon}
-			<IconComp size="100%" />
+			{@const Icon = icon}
+			<Icon size="100%" />
 		{/if}
 	</a>
 

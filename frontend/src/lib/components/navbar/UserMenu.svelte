@@ -1,33 +1,58 @@
 <script lang="ts">
-	import { DropdownMenu } from 'bits-ui';
-	import UserAvatar from '../ui/UserAvatar.svelte';
+	import UserAvatar from '$lib/components/ui/UserAvatar.svelte';
+	import { slide } from 'svelte/transition';
+	import UserMenuItem from './UserMenuItem.svelte';
+	import { Server } from 'lucide-svelte';
+	import LayoutGrid from 'lucide-svelte/icons/layout-grid';
+	import LogOut from 'lucide-svelte/icons/log-out';
+	import Settings from 'lucide-svelte/icons/settings';
+	import { afterNavigate } from '$app/navigation';
 
 	let { user } = $props<{ user: { name: string; picture: string } }>();
 
 	let open = $state(false);
+
+	afterNavigate(() => {
+		open = false;
+	});
 </script>
 
-<DropdownMenu.Root bind:open>
-	<DropdownMenu.Trigger class="flex h-full items-center rounded-xl">
-		<UserAvatar name={user.name} picture={user.picture} />
-	</DropdownMenu.Trigger>
+{#if open}
+	<div class="fixed inset-0 z-0 h-screen w-screen" onclick={() => (open = false)}></div>
+{/if}
 
-	<DropdownMenu.Content class="text-light bg-dark text-md rounded-xl p-4 font-medium">
-		<DropdownMenu.Arrow />
+<div class="relative z-10 inline-block h-full">
+	<button
+		onclick={() => {
+			open = !open;
+		}}
+		class="relative flex h-full items-center rounded-xl p-2 {open
+			? 'bg-darker'
+			: 'hover:bg-darker'} transition-colors duration-300"
+	>
+		<UserAvatar {user} />
 
-		<DropdownMenu.Group>
-			<DropdownMenu.GroupHeading class="mb-2 flex items-center gap-2">
-				<UserAvatar name={user.name} picture={user.picture} />
-				<div class="text-lg font-semibold">@{user.name}</div>
-			</DropdownMenu.GroupHeading>
-			<DropdownMenu.Item>Servers</DropdownMenu.Item>
-			<DropdownMenu.Item>Settings</DropdownMenu.Item>
-		</DropdownMenu.Group>
+		{#if open}
+			<div
+				class="text-light text-md mx-2 font-semibold sm:text-lg"
+				in:slide={{ duration: 500, axis: 'x' }}
+				out:slide={{ duration: 300, axis: 'x' }}
+			>
+				@{user.name}
+			</div>
+		{/if}
+	</button>
 
-		<DropdownMenu.Separator class="border-light my-2 border-1" />
-
-		<DropdownMenu.Group>
-			<DropdownMenu.Item>Logout</DropdownMenu.Item>
-		</DropdownMenu.Group>
-	</DropdownMenu.Content>
-</DropdownMenu.Root>
+	{#if open}
+		<div
+			class="bg-darker absolute right-0 mt-2 flex w-fit flex-col gap-2 rounded-xl p-4 shadow-black drop-shadow-lg"
+			in:slide={{ duration: 500, axis: 'y' }}
+			out:slide={{ duration: 300, axis: 'y' }}
+		>
+			<UserMenuItem icon={LayoutGrid} text={'Dashboard'} href="/dashboard" />
+			<UserMenuItem icon={Server} text={'Servers'} href="/" />
+			<UserMenuItem icon={Settings} text={'Settings'} href="/" />
+			<UserMenuItem icon={LogOut} text={'Logout'} href="/" />
+		</div>
+	{/if}
+</div>

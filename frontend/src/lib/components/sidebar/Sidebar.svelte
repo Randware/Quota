@@ -15,7 +15,7 @@
 	];
 </script>
 
-<aside class="bg-dark flex h-full w-20 flex-col gap-2 p-2">
+<aside class="bg-dark flex h-full w-18 flex-col gap-2 p-2 sm:w-20">
 	{#each pages as page}
 		<SidebarItem name={page.name} icon={page.icon} path={page.path} />
 	{/each}
