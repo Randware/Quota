@@ -12,7 +12,7 @@
 	let active: boolean = $derived(page.url.pathname === path);
 </script>
 
-<div class="relative m-2 inline-flex items-center justify-center">
+<div class="relative inline-flex items-center justify-center">
 	<a
 		href={path}
 		aria-label="Go to {name.toLowerCase()} dashboard page"

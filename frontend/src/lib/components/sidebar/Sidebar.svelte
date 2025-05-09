@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { Settings, type Icon, ChartNoAxesColumn, LayoutGrid } from 'lucide-svelte';
-	import CubeContainer from '$lib/components/ui/CubeContainer.svelte';
 	import SidebarItem from './SidebarItem.svelte';
 
 	interface Page {
@@ -16,10 +15,8 @@
 	];
 </script>
 
-<aside class="bg-dark flex h-full flex-col">
+<aside class="bg-dark flex h-full w-20 flex-col gap-2 p-2">
 	{#each pages as page}
-		<CubeContainer>
-			<SidebarItem name={page.name} icon={page.icon} path={page.path} />
-		</CubeContainer>
+		<SidebarItem name={page.name} icon={page.icon} path={page.path} />
 	{/each}
 </aside>
