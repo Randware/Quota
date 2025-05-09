@@ -3,15 +3,11 @@
 	import type { Icon } from 'lucide-svelte';
 	import { scale } from 'svelte/transition';
 
-	let {
-		name,
-		icon,
-		path
-	}: {
+	let { name, icon, path } = $props<{
 		name: string;
 		icon: typeof Icon;
 		path: string;
-	} = $props();
+	}>();
 
 	let active: boolean = $derived(page.url.pathname === path);
 </script>

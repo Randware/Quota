@@ -9,7 +9,6 @@ export const GET: RequestHandler = async ({ url, fetch, cookies }) => {
 
   //  TODO: Show error here
   if (!urlState || !storedState || urlState !== storedState) {
-    console.log("storedState:", storedState, "urlState:", urlState);
     throw redirect(302, '/');
   }
 

@@ -43,6 +43,7 @@
 	},
 	"dependencies": {
 		"@fontsource-variable/roboto": "^5.2.5",
+		"bits-ui": "^1.4.6",
 		"lucide-svelte": "^0.506.0"
 	}
 }
