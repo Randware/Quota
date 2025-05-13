@@ -6,7 +6,9 @@
 	let { user } = $props<{ user: { name: string; picture: string } | null }>();
 </script>
 
-<header class="bg-dark flex h-18 w-full items-center gap-2 p-2 sm:h-20">
+<header
+	class="bg-dark flex max-h-18 min-h-18 w-full items-center gap-2 p-2 sm:max-h-20 sm:min-h-20"
+>
 	<a href="/" class="text-primary aspect-square h-full p-3">
 		<QuotaLogo size={'100%'} />
 	</a>
