@@ -1,11 +1,5 @@
 import { dev } from "$app/environment";
-
-export interface Session {
-  auth_token: string;
-  refresh_token: string;
-  userName: string;
-  userAvatar: string;
-}
+import type { Session } from "./types";
 
 const MOCK_TOKEN: string = "MOCK_TOKEN";
 const MOCK_SESSION: Session = { auth_token: "1234567890", refresh_token: "1234567890", userName: "mockuser", userAvatar: "" }

@@ -6,7 +6,7 @@
 
 <a
 	{href}
-	class="hover:bg-dark text-light flex items-center justify-center gap-2 rounded-xl px-4 py-2 transition-colors duration-300"
+	class="hover:bg-highlight text-light flex items-center justify-center gap-2 rounded-xl px-4 py-2 transition-colors duration-300"
 >
 	{#if true}
 		{@const Icon = icon}

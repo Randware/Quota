@@ -6,8 +6,9 @@
 @theme {
 	--color-primary: rgb(247, 111, 83);
 	--color-light: rgb(242, 240, 227);
+	--color-highlight: rgb(40, 40, 40);
 	--color-dark: rgb(32, 32, 32);
-	--color-darker: rgb(29, 29, 29);
+	--color-darker: rgb(26, 26, 26);
 	--font-simple: 'Roboto', sans-serif;
 	--default-font-family: 'Roboto', sans-serif;
 }

@@ -27,8 +27,8 @@
 			open = !open;
 		}}
 		class="relative flex h-full items-center rounded-xl p-2 {open
-			? 'bg-darker'
-			: 'hover:bg-darker'} transition-colors duration-300"
+			? 'bg-highlight'
+			: 'hover:bg-highlight'} transition-colors duration-300"
 	>
 		<UserAvatar {user} />
 
@@ -45,7 +45,7 @@
 
 	{#if open}
 		<div
-			class="bg-darker absolute right-0 mt-2 flex w-fit flex-col gap-2 rounded-xl p-4 shadow-black drop-shadow-lg"
+			class="bg-dark absolute right-0 mt-4 flex w-fit flex-col gap-2 rounded-xl p-4 shadow-black drop-shadow-lg"
 			in:slide={{ duration: 500, axis: 'y' }}
 			out:slide={{ duration: 300, axis: 'y' }}
 		>

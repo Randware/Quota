@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { Plus } from 'lucide-svelte';
 	import Button from '../ui/Button.svelte';
-	import ChannelItem, { type Channel } from './ChannelItem.svelte';
+	import ChannelItem from './ChannelItem.svelte';
 	import SettingsItem from './SettingsItem.svelte';
+	import Switch from '../ui/Switch.svelte';
+	import { type Channel } from '$lib/server/types';
 
 	let channels: Channel[] = [
 		{
@@ -26,6 +28,10 @@
 	description={'Configure in which channels the bot is allowed to operate'}
 >
 	<div class="flex flex-col gap-4">
+		<div class="mx-auto flex items-center gap-2">
+			<div class="text-light text-center font-semibold">Lock channels</div>
+			<Switch />
+		</div>
 		<Button onclick={() => console.log('Add channel')}>
 			<div class="text-light flex w-full items-center">
 				<Plus />
@@ -40,7 +46,7 @@
 				{/each}
 			{:else}
 				<div
-					class="border-light text-light rounded-xl border-2 border-dashed p-4 text-center font-semibold"
+					class="border-highlight text-light rounded-xl border-2 border-dashed p-4 text-center font-semibold"
 				>
 					No channels
 				</div>

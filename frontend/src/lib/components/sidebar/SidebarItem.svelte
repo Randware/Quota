@@ -17,8 +17,8 @@
 		href={path}
 		aria-label="Go to {name.toLowerCase()} dashboard page"
 		class="text-light rounded-xl
-           {active ? 'bg-darker' : ''}
-           hover:bg-darker p-4 transition-colors duration-300"
+           {active ? 'bg-highlight' : ''}
+           hover:bg-highlight p-4 transition-colors duration-300"
 	>
 		{#if true}
 			{@const Icon = icon}
