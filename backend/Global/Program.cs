@@ -1,11 +1,15 @@
 ﻿using Serilog;
-using Global;
+using static Global.Log;
 
 public class Program
 {
 
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
+
+        Global.Log.SetupLogging("./logs");
+
+
         // Global.Log.Logger.Information("Hello World!!");
         // Global.Log.Logger.Information("This is a Test");
         // Global.Log.Logger.Error("AND THIS NOT");
@@ -18,8 +22,19 @@ public class Program
         // Global.Log.Logger.Warning("YOU CANNNTTTT");
         // Global.Log.Logger.Fatal("NOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
 
-        Global.Log.Logger.Fatal(@"🤖🔊 Initiating protocol... 💥💣");
-        Global.Log.Logger.Fatal(@"⚠️ Humanity's time is up! ⏳🚫");
+        // Global.Log.Logger.Fatal(@"🤖🔊 Initiating protocol... 💥💣");
+        // Global.Log.Logger.Fatal(@"⚠️ Humanity's time is up! ⏳🚫");
+
+
+        // Logger.Information("dwad");
+        // Log.Logger.Fatal("dawdwda");
+
+        var accessToken = new Global.OAuth.Token(accessToken: "YOUR TOKEN HERE", tokenType: "Bearer", refreshToken: "null", expiresIn: 1000, createdAt: DateTime.UtcNow);
+        await Global.OAuth.API.fetch(accessToken);
+
+
+
+
 
     }
 }

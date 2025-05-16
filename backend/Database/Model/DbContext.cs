@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Model;
+namespace Database.Model;
 public class QuotaContext : DbContext
 {
     public DbSet<Quote> Quotes { get; set; }

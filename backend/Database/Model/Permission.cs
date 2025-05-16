@@ -1,4 +1,4 @@
-namespace Model;
+namespace Database.Model;
 
 public enum PermissionType
 {
