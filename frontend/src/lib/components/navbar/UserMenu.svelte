@@ -18,10 +18,10 @@
 </script>
 
 {#if open}
-	<div class="fixed inset-0 z-0 h-screen w-screen" onclick={() => (open = false)}></div>
+	<div class="fixed inset-0 z-40 h-screen w-screen" onclick={() => (open = false)}></div>
 {/if}
 
-<div class="relative z-10 inline-block h-full">
+<div class="relative z-50 inline-block h-full">
 	<button
 		onclick={() => {
 			open = !open;
@@ -35,8 +35,7 @@
 		{#if open}
 			<div
 				class="text-light text-md mx-2 font-semibold sm:text-lg"
-				in:slide={{ duration: 500, axis: 'x' }}
-				out:slide={{ duration: 300, axis: 'x' }}
+				transition:slide={{ duration: 500, axis: 'x' }}
 			>
 				@{user.name}
 			</div>
@@ -46,8 +45,7 @@
 	{#if open}
 		<div
 			class="bg-dark absolute right-0 mt-4 flex w-fit flex-col gap-2 rounded-xl p-4 shadow-black drop-shadow-lg"
-			in:slide={{ duration: 500, axis: 'y' }}
-			out:slide={{ duration: 300, axis: 'y' }}
+			transition:slide={{ duration: 500, axis: 'y' }}
 		>
 			<UserMenuItem icon={LayoutGrid} text={'Dashboard'} href="/dashboard" />
 			<UserMenuItem icon={Server} text={'Servers'} href="/" />

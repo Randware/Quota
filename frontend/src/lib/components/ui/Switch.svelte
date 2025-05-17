@@ -3,7 +3,7 @@
 </script>
 
 <button
-	on:click={() => (toggled = !toggled)}
+	onclick={() => (toggled = !toggled)}
 	class="border-light/50 bg-dark flex aspect-video h-8 items-center rounded-full
          border-2 p-1 transition-colors duration-300
          {toggled ? 'bg-primary' : 'bg-dark'}"

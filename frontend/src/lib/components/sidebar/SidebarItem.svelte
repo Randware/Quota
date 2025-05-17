@@ -28,7 +28,7 @@
 
 	{#if active}
 		<div
-			in:scale={{ duration: 300 }}
+			transition:scale={{ duration: 300 }}
 			class="bg-primary absolute right-0 h-[50%] w-1.5 translate-x-1/2 rounded-full"
 		></div>
 	{/if}
