@@ -5,6 +5,24 @@ export interface Session {
   userAvatar: string;
 }
 
+export interface TextEmoji {
+  id: string;
+  name: string;
+  native: string;
+}
+
+export interface ImageEmoji {
+  id: string;
+  name: string;
+  src: string;
+}
+
+export interface CustomEmojiCollection {
+  id: string;
+  name: string;
+  emojis: ImageEmoji[];
+}
+
 export interface Channel {
   id: string;
   name: string;

@@ -1,17 +1,15 @@
 <script lang="ts">
 	//  TODO: Make responsive
 	//        (maybe) Adjust border-radius
-	//        Create typing for onSelect and custom emojis
 
 	import { Picker } from 'emoji-mart';
 	import data from '@emoji-mart/data';
 	import { onMount } from 'svelte';
+	import type { CustomEmojiCollection, ImageEmoji, TextEmoji } from '$lib/server/types';
 
 	let { onSelect, custom = [] } = $props<{
-		onSelect: (id: string, name: string, native: string) => void;
-		custom: [
-			{ id: string; name: string; emojis: [{ id: string; name: string; skins: [{ src: string }] }] }
-		];
+		onSelect: (emoji: TextEmoji | ImageEmoji) => void;
+		custom: CustomEmojiCollection[];
 	}>();
 
 	let container: HTMLDivElement;
@@ -35,11 +33,27 @@
 		primaryColor = convertColor(getComputedStyle(container).getPropertyValue('--color-primary'));
 		darkColor = convertColor(getComputedStyle(container).getPropertyValue('--color-dark'));
 
+		const mapped = custom.map((c: CustomEmojiCollection) => ({
+			id: c.id,
+			name: c.name,
+			emojis: c.emojis.map((e: ImageEmoji) => {
+				return { id: e.id, name: e.name, keywords: [e.name], skins: [{ src: e.src }] };
+			})
+		}));
+
+		console.log(mapped);
+
 		new Picker({
 			parent: container,
 			data,
-			custom,
-			onEmojiSelect: onSelect,
+			custom: mapped,
+			onEmojiSelect: (emoji: any) => {
+				if (emoji.src) {
+					onSelect({ type: 'image', id: emoji.id, name: emoji.name, src: emoji.src });
+				} else {
+					onSelect({ type: 'text', id: emoji.id, name: emoji.name, native: emoji.native });
+				}
+			},
 			skinTonePosition: 'none'
 		});
 	});
@@ -47,12 +61,9 @@
 
 <div
 	bind:this={container}
-	class="
-    [--rgb-accent:{primaryColor}]
-    [--rgb-background:{darkColor}]
-    [--rgb-input:var(--color-dark)]
+	style="
+    --rgb-accent: {primaryColor};
+    --rgb-background: {darkColor};
+    --rgb-input: {darkColor};
   "
 ></div>
-
-<style>
-</style>
