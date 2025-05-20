@@ -129,17 +129,32 @@ public class QuotaContext : DbContext
              .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // DiscordToken
+        modelBuilder.Entity<DiscordToken>(b =>
+        {
+            b.HasKey(dt => dt.ID);
+            b.Property(dt => dt.DiscordID).IsRequired();
+            b.Property(dt => dt.AccessToken).IsRequired();
+            b.Property(dt => dt.RefreshToken).IsRequired();
+            b.Property(dt => dt.ExpiresAt).IsRequired();
+            b.Property(dt => dt.CreatedAt).IsRequired();
+            b.HasIndex(dt => dt.DiscordID).IsUnique();
+        });
+
         // Session
         modelBuilder.Entity<Session>(b =>
         {
             b.HasKey(s => s.ID);
-            b.Property(s => s.SessionToken).IsRequired();
-            b.Property(s => s.DiscordID).IsRequired();
-            b.Property(s => s.AuthToken).IsRequired();
             b.Property(s => s.RefreshToken).IsRequired();
-            b.Property(s => s.TokenExpires).IsRequired();
-            b.Property(s => s.SessionExpires).IsRequired();
+            b.Property(s => s.Revoked).IsRequired();
+            b.Property(s => s.ExpiresAt).IsRequired();
             b.Property(s => s.CreatedAt).IsRequired();
+
+            b.HasOne(s => s.Token)
+                       .WithMany(dt => dt.Sessions)
+                       .HasForeignKey(s => s.TokenID)
+                       .IsRequired()
+                       .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }
