@@ -13,18 +13,20 @@ public struct Token
     /// </summary>
     public long ExpiresIn { get; init; }
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+    public HashSet<string> Scope { get; init; }
     /// <summary>
     /// True once ExpiresIn is 0.
     /// </summary>
     public bool IsExpired => Remaining() <= 0;
 
-    public Token(string accessToken, string refreshToken, string tokenType, uint expiresIn, DateTime? createdAt = null)
+    public Token(string accessToken, string refreshToken, string tokenType, uint expiresIn, DateTime? createdAt = null, HashSet<string>? scope = null)
     {
         TokenType = tokenType ?? throw new ArgumentNullException(nameof(tokenType));
         AccessToken = accessToken ?? throw new ArgumentNullException(nameof(accessToken));
         RefreshToken = refreshToken ?? throw new ArgumentNullException(nameof(refreshToken));
         ExpiresIn = expiresIn;
         CreatedAt = createdAt?.ToUniversalTime() ?? DateTime.UtcNow;
+        Scope = scope ?? new HashSet<string>();
     }
 
     /// <summary>
@@ -37,7 +39,7 @@ public struct Token
         return (long)Math.Max(0, remaining);
     }
 
-    public override string ToString() => $"Token {{\n\tAccess Token: {AccessToken}\n\tRefresh Token: {RefreshToken}\n\tToken Type: {TokenType}\n\tExpires in: {Remaining()} seconds\n}}";
+    public override string ToString() => $"Token {{\n\tAccess Token: {AccessToken}\n\tRefresh Token: {RefreshToken}\n\tToken Type: {TokenType}\n\tExpires in: {Remaining()} seconds\n\tScope: {string.Join(" ", Scope)}\n}}";
 
 }
 
@@ -47,11 +49,19 @@ public struct User
     public string Username { get; init; }
     public string GlobalName { get; init; }
     public string Avatar { get; init; }
-    public sbyte Premium { get; init; }
+    public Nitro Premium { get; init; }
     public bool Mfa { get; init; }
 
+    public enum Nitro : sbyte
+    {
+        None = 0,
+        Classic = 1,
+        Normal = 2,
+        Basic = 3,
+    }
 
-    public User(string id, string username, string globalName, string avatar, sbyte premium, bool mfa)
+
+    public User(string id, string username, string globalName, string avatar, Nitro premium, bool mfa)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Username = username ?? throw new ArgumentNullException(nameof(username));
@@ -60,4 +70,7 @@ public struct User
         Premium = premium;
         Mfa = mfa;
     }
+
+
+    public override string ToString() => $"User {{\n\tID: {Id}\n\tUsername: {Username}\n\tGlobal Name: {GlobalName}\n\tNitro: {Premium} \n\tMfa: {(Mfa ? "enabled" : "disabled")}\n}}";
 }

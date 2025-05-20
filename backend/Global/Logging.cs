@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using Serilog;
+using Serilog.Exceptions;
 
 namespace Global;
 
@@ -111,11 +112,12 @@ public static class Log
             }
 
             var loggerConfig = new LoggerConfiguration()
-                                       .MinimumLevel.Is(Log.IsDebugMode
-                                                       ? Serilog.Events.LogEventLevel.Debug
-                                                       : Serilog.Events.LogEventLevel.Information)
-                                       .WriteTo.Console()
-                                       .WriteTo.File(latest);
+            .Enrich.WithExceptionDetails()
+            .MinimumLevel.Is(Log.IsDebugMode
+                            ? Serilog.Events.LogEventLevel.Debug
+                            : Serilog.Events.LogEventLevel.Information)
+            .WriteTo.Console()
+            .WriteTo.File(latest);
 
             _logger = loggerConfig.CreateLogger();
             Serilog.Log.Logger = _logger;

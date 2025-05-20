@@ -29,8 +29,15 @@ public class Program
         // Logger.Information("dwad");
         // Log.Logger.Fatal("dawdwda");
 
-        var accessToken = new Global.OAuth.Token(accessToken: "YOUR TOKEN HERE", tokenType: "Bearer", refreshToken: "null", expiresIn: 1000, createdAt: DateTime.UtcNow);
-        await Global.OAuth.API.fetch(accessToken);
+        var token = await Global.OAuth.API.GetToken(clientID: "YOUR-CLIENT-ID-HERE",
+            clientSecret: "YOU-CLIENT-SECRET-HERE",
+            code: "YOUR-CODE-HERE",
+            redirectUri: "YOUR-REDIRECT-CODE-HERE");
+        Log.Logger.Information(token.Value.ToString());
+        var user = await Global.OAuth.API.FetchUser(token.Value);
+        Log.Logger.Information(user.Value.ToString());
+
+
 
 
 
