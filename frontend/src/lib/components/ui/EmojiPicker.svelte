@@ -15,6 +15,7 @@
 	let container: HTMLDivElement;
 	let primaryColor: string = $state('');
 	let darkColor: string = $state('');
+	let font: string = $state('');
 
 	function convertColor(cssColor: string): string {
 		const match = cssColor.match(/rgba?\(\s*([^)]+)\s*\)/i);
@@ -32,6 +33,7 @@
 	onMount(() => {
 		primaryColor = convertColor(getComputedStyle(container).getPropertyValue('--color-primary'));
 		darkColor = convertColor(getComputedStyle(container).getPropertyValue('--color-dark'));
+		font = getComputedStyle(container).getPropertyValue('--font-emoji');
 
 		const mapped = custom.map((c: CustomEmojiCollection) => ({
 			id: c.id,
@@ -41,20 +43,19 @@
 			})
 		}));
 
-		console.log(mapped);
-
 		new Picker({
 			parent: container,
 			data,
+			set: 'twitter',
 			custom: mapped,
+			autoFocus: true,
 			onEmojiSelect: (emoji: any) => {
 				if (emoji.src) {
 					onSelect({ type: 'image', id: emoji.id, name: emoji.name, src: emoji.src });
 				} else {
 					onSelect({ type: 'text', id: emoji.id, name: emoji.name, native: emoji.native });
 				}
-			},
-			skinTonePosition: 'none'
+			}
 		});
 	});
 </script>
@@ -65,5 +66,6 @@
     --rgb-accent: {primaryColor};
     --rgb-background: {darkColor};
     --rgb-input: {darkColor};
+    --font-family: {font};
   "
 ></div>

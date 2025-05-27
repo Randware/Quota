@@ -8,7 +8,7 @@
 	<div class="text-md flex-1 truncate text-center font-semibold">#{name}</div>
 	<button
 		onclick={() => remove(id)}
-		class="hover:bg-highlight rounded-xl p-2 transition-colors duration-300"
+		class=" bg-dark border-highlight hover:bg-highlight rounded-xl border-2 p-2 transition-colors duration-300"
 	>
 		<Trash2 />
 	</button>
