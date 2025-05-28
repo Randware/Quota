@@ -6,7 +6,6 @@
 	import data from '@emoji-mart/data';
 	import { onMount } from 'svelte';
 	import type { CustomEmojiCollection, ImageEmoji, TextEmoji } from '$lib/server/types';
-
 	let { onSelect, custom = [] } = $props<{
 		onSelect: (emoji: TextEmoji | ImageEmoji) => void;
 		custom: CustomEmojiCollection[];
@@ -46,7 +45,6 @@
 		new Picker({
 			parent: container,
 			data,
-			set: 'twitter',
 			custom: mapped,
 			autoFocus: true,
 			onEmojiSelect: (emoji: any) => {

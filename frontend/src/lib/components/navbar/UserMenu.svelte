@@ -7,10 +7,18 @@
 	import LogOut from 'lucide-svelte/icons/log-out';
 	import Settings from 'lucide-svelte/icons/settings';
 	import { afterNavigate } from '$app/navigation';
+	import { createFloatingActions } from 'svelte-floating-ui';
+	import { offset } from 'svelte-floating-ui/dom';
 
 	let { user } = $props<{ user: { name: string; picture: string } }>();
 
 	let open = $state(false);
+
+	const [referenceAction, floatingAction] = createFloatingActions({
+		placement: 'bottom-end',
+		middleware: [offset(15)],
+		autoUpdate: true
+	});
 
 	afterNavigate(() => {
 		open = false;
@@ -21,12 +29,13 @@
 	<div class="fixed inset-0 z-40 h-screen w-screen" onclick={() => (open = false)}></div>
 {/if}
 
-<div class="relative z-50 inline-block h-full">
+<div class="z-50 h-full">
 	<button
+		use:referenceAction
 		onclick={() => {
 			open = !open;
 		}}
-		class="relative flex h-full items-center rounded-xl p-2 {open
+		class="flex h-full items-center rounded-xl p-2 {open
 			? 'bg-highlight'
 			: 'hover:bg-highlight'} transition-colors duration-300"
 	>
@@ -44,7 +53,8 @@
 
 	{#if open}
 		<div
-			class="bg-dark absolute right-0 mt-4 flex w-fit flex-col gap-2 rounded-xl p-4 shadow-black drop-shadow-lg"
+			use:floatingAction
+			class="bg-dark right-0 flex w-fit flex-col gap-2 rounded-xl p-4 shadow-black drop-shadow-lg"
 			transition:slide={{ duration: 500, axis: 'y' }}
 		>
 			<UserMenuItem icon={LayoutGrid} text={'Dashboard'} href="/dashboard" />
