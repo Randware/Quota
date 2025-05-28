@@ -3,7 +3,7 @@
 	//        (maybe) Adjust border-radius
 
 	import { Picker } from 'emoji-mart';
-	import data from '@emoji-mart/data';
+	import data from '@emoji-mart/data/sets/15/twitter.json';
 	import { onMount } from 'svelte';
 	import type { CustomEmojiCollection, ImageEmoji, TextEmoji } from '$lib/server/types';
 	let { onSelect, custom = [] } = $props<{
@@ -46,6 +46,7 @@
 			parent: container,
 			data,
 			custom: mapped,
+			set: 'twitter',
 			autoFocus: true,
 			onEmojiSelect: (emoji: any) => {
 				if (emoji.src) {
