@@ -32,7 +32,7 @@
 
 <button
 	use:referenceAction
-	class="bg-dark border-highlight hover:bg-highlight z-50 flex aspect-square w-12 items-center justify-center rounded-xl border-2 p-2 transition-colors duration-300 {showSelector
+	class="bg-dark border-highlight hover:bg-highlight flex aspect-square w-12 items-center justify-center rounded-xl border-2 p-2 transition-colors duration-300 {showSelector
 		? 'bg-highlight'
 		: ''}"
 	onclick={() => (showSelector = !showSelector)}
