@@ -31,13 +31,13 @@ public class Program
         // Log.Logger.Fatal("dawdwda");
         var client = new Client
         {
-            ID = "CLIENT_ID",
-            Secret = "CLIENT_SECRET"
+            ID = "",
+            Secret = ""
         };
 
         var token = await Global.OAuth.API.GetToken(
-            code: "USER_CODE",
-            redirectUri: "REDIRECT_URI",
+            code: "",
+            redirectUri: "",
             client: client
             );
         Log.Logger.Information(token.Value.ToString());
@@ -48,6 +48,8 @@ public class Program
         var token2 = await Global.OAuth.API.RefreshToken(token.Value, client);
 
         Log.Logger.Information(token2.Value.ToString());
+
+        Log.Logger.Information((await Global.OAuth.API.RevokeToken(token2.Value, client)) + "");
 
 
 
