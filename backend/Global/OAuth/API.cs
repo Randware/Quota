@@ -38,7 +38,7 @@ public static class API
                     using JsonDocument doc = JsonDocument.Parse(content);
                     var user = new User
                     {
-                        Id = doc.RootElement.GetProperty("id").GetString() ?? throw new NullReferenceException("The returned id is null"),
+                        ID = doc.RootElement.GetProperty("id").GetString() ?? throw new NullReferenceException("The returned id is null"),
                         Username = doc.RootElement.GetProperty("username").GetString() ?? throw new NullReferenceException("The returned username is null"),
                         Avatar = doc.RootElement.GetProperty("avatar").GetString() ?? throw new NullReferenceException("The avatar is null"),
                         Premium = (Global.OAuth.User.Nitro)doc.RootElement.GetProperty("premium_type").GetSByte(),
@@ -95,11 +95,10 @@ public static class API
     /// <summary>
     /// Fetches the Access and Refresh Token from the Discord API. 
     /// </summary>
-    /// <param name="clientID">The clientID of the Discord Application.</param>
-    /// <param name="clientSecret">The clientSecret of the Discord Application.</param>
     /// <param name="code">The code from the user that authorized to Application.</param>
     /// <param name="redirectUri">The uri to redirect to. Does not actually redirect.
     /// <b>HAS to be the same redirecting URI as the one that was used the get the code.</b></param>
+    /// <param name="client">A client object representing a Discord Client/Application that contains the credentials to make such API request</param>
     /// <returns>
     /// A Object representing the Token with fields such as AccessToken, RefreshToken, TokenType,... etc.
     /// May return <c>null</c> if one of the parameter (or multiple) are incorrect or an unexpected exception occurs.
@@ -107,13 +106,13 @@ public static class API
     /// <exception cref="HttpRequestException">
     /// Thrown when the HTTP request fails due to network issues or an invalid response from the server.
     /// </exception>
-    public static async Task<Token?> GetToken(string clientID, string clientSecret, string code, string redirectUri)
+    public static async Task<Token?> GetToken(string code, string redirectUri, Client client)
     {
 
 
-        using HttpClient client = new();
-        var authToken = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{clientID}:{clientSecret}"));
-        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authToken);
+        using HttpClient httpClient = new();
+        var authToken = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{client.ID}:{client.Secret}"));
+        httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authToken);
 
         var form = new FormUrlEncodedContent(new[] {
                 new KeyValuePair<string, string>("grant_type", "authorization_code"),
@@ -126,7 +125,7 @@ public static class API
 
             for (int attempt = 0; attempt < 3; attempt++)
             {
-                var response = await client.PostAsync("https://discord.com/api/v10/oauth2/token", form);
+                var response = await httpClient.PostAsync($"{client.ApiEndpoint}/oauth2/token", form);
                 string content = await response.Content.ReadAsStringAsync();
                 if (response.IsSuccessStatusCode)
                 {
@@ -179,6 +178,76 @@ public static class API
         return null;
     }
 
+    /// <summary>
+    /// Revokes the Access and Refresh Token. 
+    /// </summary>
+    /// <param name="token">A Object representing the Token with fields such as AccessToken, RefreshToken, TokenType,... etc.</param>
+    /// <param name="client">A Object representing a Discord Client/Application that contains the credentials to make such API request</param>
+    /// <returns>
+    /// Whether or not the revocation was a success
+    /// </returns>
+    /// <exception cref="HttpRequestException">
+    /// Thrown when the HTTP request fails due to network issues or an invalid response from the server.
+    /// </exception>
+    public static async Task<bool> RevokeToken(Token token, Client client)
+    {
+
+        using HttpClient httpClient = new();
+        var authToken = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{client.ID}:{client.Secret}"));
+        httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authToken);
+
+        var form = new FormUrlEncodedContent(new[] {
+                new KeyValuePair<string, string>("token", token.AccessToken),
+                new KeyValuePair<string, string>("token_type_hint", "access_token")
+        });
+
+        try
+        {
+
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                var response = await httpClient.PostAsync($"{client.ApiEndpoint}/oauth2/token/revoke", form);
+                string content = await response.Content.ReadAsStringAsync();
+                if (response.IsSuccessStatusCode)
+                {
+                    return true;
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                {
+
+                    int retryAfterMs = JsonDocument.Parse(content).RootElement.GetProperty("retry_after").GetInt32();
+                    Global.Log.Logger.Warning(
+                        @$"Rate limited. Attempting {3 - attempt} more times.
+                    Waiting {retryAfterMs}ms before retrying...");
+                    await Task.Delay(retryAfterMs);
+                    continue;
+
+                }
+                else
+                {
+                    Global.Log.Logger.Debug($"Error from Discord API while revoking user Token: {content.ToString()}");
+                    return false;
+                }
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            Global.Log.Logger.Error(ex, $"Request failed: {ex.Message}");
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            Global.Log.Logger.Error(ex, $"JSON parsing failed: {ex.Message}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Global.Log.Logger.Error(ex, $"Unexpected error: {ex.Message}");
+            return false;
+        }
+        return false;
+    }
+
 
     /// <summary>
     /// Fetches the Username of the Token.
@@ -215,7 +284,7 @@ public static class API
 
         if (user.HasValue)
         {
-            return user.Value.Id;
+            return user.Value.ID;
         }
         else
         {

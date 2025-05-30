@@ -1,7 +1,12 @@
 
 namespace Global.OAuth;
+//TODO: Merge to the DB model class
 
-public struct Token
+///<summary>
+/// Represents all sorts of prameters the application received during the OAuth2 process.
+/// This includes Access & Refresh Token, Type of token, Scopes and expiry date
+///</summary>
+public readonly struct Token
 {
 
     public string AccessToken { get; init; }
@@ -43,9 +48,12 @@ public struct Token
 
 }
 
-public struct User
+/// <summary>
+/// Represents a Discord User 
+/// </summary>
+public readonly struct User
 {
-    public string Id { get; init; }
+    public string ID { get; init; }
     public string Username { get; init; }
     public string GlobalName { get; init; }
     public string Avatar { get; init; }
@@ -63,7 +71,7 @@ public struct User
 
     public User(string id, string username, string globalName, string avatar, Nitro premium, bool mfa)
     {
-        Id = id ?? throw new ArgumentNullException(nameof(id));
+        ID = id ?? throw new ArgumentNullException(nameof(id));
         Username = username ?? throw new ArgumentNullException(nameof(username));
         GlobalName = globalName ?? throw new ArgumentNullException(nameof(globalName));
         Avatar = avatar;
@@ -72,5 +80,36 @@ public struct User
     }
 
 
-    public override string ToString() => $"User {{\n\tID: {Id}\n\tUsername: {Username}\n\tGlobal Name: {GlobalName}\n\tNitro: {Premium} \n\tMfa: {(Mfa ? "enabled" : "disabled")}\n}}";
+    public override string ToString() => $"User {{\n\tID: {ID}\n\tUsername: {Username}\n\tGlobal Name: {GlobalName}\n\tNitro: {Premium} \n\tMfa: {(Mfa ? "enabled" : "disabled")}\n}}";
+}
+
+
+/// <summary>
+/// Represents a Discord Client 
+/// </summary>
+public readonly struct Client
+{
+    public string ID { get; init; }
+    public string Secret { get; init; }
+    public string ApiEndpoint { get; init; } = "https://discord.com/api/v10";
+
+    // Required because defining any constructor disables the default one that applies field initializers.
+    public Client()
+    {
+        ID = "";
+        Secret = "";
+        ApiEndpoint = "https://discord.com/api/v10";
+    }
+
+    public Client(string id, string secret, string? apiEndpoint = null)
+    {
+        ID = id ?? throw new ArgumentNullException(nameof(id));
+        Secret = secret ?? throw new ArgumentNullException(nameof(secret));
+        var endpoint = (apiEndpoint ?? "https://discord.com/api/v10");
+        ApiEndpoint = endpoint.EndsWith("/") ? endpoint[..^1] : endpoint;
+
+    }
+
+
+    public override string ToString() => $"Client {{\n\tID: {ID}\n\tSecret: {Secret}\n\tAPI Endpoint: {ApiEndpoint}\n}}";
 }

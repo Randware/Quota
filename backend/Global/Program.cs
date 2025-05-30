@@ -1,4 +1,5 @@
-﻿using Serilog;
+﻿using Global.OAuth;
+using Serilog;
 using static Global.Log;
 
 public class Program
@@ -28,14 +29,21 @@ public class Program
 
         // Logger.Information("dwad");
         // Log.Logger.Fatal("dawdwda");
+        var client = new Client
+        {
+            ID = "CLIENT_ID",
+            Secret = "CLIENT_SECRET"
+        };
 
-        var token = await Global.OAuth.API.GetToken(clientID: "YOUR-CLIENT-ID-HERE",
-            clientSecret: "YOU-CLIENT-SECRET-HERE",
-            code: "YOUR-CODE-HERE",
-            redirectUri: "YOUR-REDIRECT-CODE-HERE");
+        var token = await Global.OAuth.API.GetToken(
+            code: "USER_CODE",
+            redirectUri: "CLIENT_REDIRECT_URI",
+            client: client
+            );
         Log.Logger.Information(token.Value.ToString());
         var user = await Global.OAuth.API.FetchUser(token.Value);
         Log.Logger.Information(user.Value.ToString());
+        var success = await Global.OAuth.API.RevokeToken(token.Value, client);
 
 
 
