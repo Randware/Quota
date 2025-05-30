@@ -37,14 +37,17 @@ public class Program
 
         var token = await Global.OAuth.API.GetToken(
             code: "USER_CODE",
-            redirectUri: "CLIENT_REDIRECT_URI",
+            redirectUri: "REDIRECT_URI",
             client: client
             );
         Log.Logger.Information(token.Value.ToString());
-        var user = await Global.OAuth.API.FetchUser(token.Value);
-        Log.Logger.Information(user.Value.ToString());
-        var success = await Global.OAuth.API.RevokeToken(token.Value, client);
+        Log.Logger.Information("" + token.Value.Remaining());
+        Thread.Sleep(10000);
 
+        Log.Logger.Information("" + token.Value.Remaining());
+        var token2 = await Global.OAuth.API.RefreshToken(token.Value, client);
+
+        Log.Logger.Information(token2.Value.ToString());
 
 
 

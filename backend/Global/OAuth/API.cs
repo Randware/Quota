@@ -4,6 +4,8 @@ using System.Text.Json;
 using static Global.Util;
 using static Global.Log;
 
+//TODO: Remove the enormous amount of code duplicaiton. (I am way to lazy right now)
+
 public static class API
 {
 
@@ -248,6 +250,89 @@ public static class API
         return false;
     }
 
+
+
+    /// <summary>
+    /// Refreshes the Access and Refresh Token from the Discord API. 
+    /// </summary>
+    /// <param name="token">A Object representing the Token with fields such as AccessToken, RefreshToken, TokenType,... etc.</param>
+    /// <param name="client">A client object representing a Discord Client/Application that contains the credentials to make such API request</param>
+    /// <returns>
+    /// The refreshed <c>Token</c> 
+    /// </returns>
+    /// <exception cref="HttpRequestException">
+    /// Thrown when the HTTP request fails due to network issues or an invalid response from the server.
+    /// </exception>
+    public static async Task<Token?> RefreshToken(Token token, Client client)
+    {
+
+
+        using HttpClient httpClient = new();
+        var authToken = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{client.ID}:{client.Secret}"));
+        httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", authToken);
+
+        var form = new FormUrlEncodedContent(new[] {
+                new KeyValuePair<string, string>("grant_type", "refresh_token"),
+                new KeyValuePair<string, string>("refresh_token", token.RefreshToken),
+        });
+
+        try
+        {
+
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                var response = await httpClient.PostAsync($"{client.ApiEndpoint}/oauth2/token", form);
+                string content = await response.Content.ReadAsStringAsync();
+                if (response.IsSuccessStatusCode)
+                {
+
+                    using JsonDocument doc = JsonDocument.Parse(content);
+                    Token newToken = new Token
+                    {
+                        TokenType = doc.RootElement.GetProperty("token_type").GetString() ?? throw new NullReferenceException("The returned token_type is null"),
+                        AccessToken = doc.RootElement.GetProperty("access_token").GetString() ?? throw new NullReferenceException("The returned  is null"),
+                        RefreshToken = doc.RootElement.GetProperty("refresh_token").GetString() ?? throw new NullReferenceException("The returned refresh_token is null"),
+                        ExpiresIn = doc.RootElement.GetProperty("expires_in").GetInt64(),
+                        CreatedAt = DateTime.UtcNow,
+                        Scope = (doc.RootElement.GetProperty("scope").GetString() ?? "").Split(" ").ToHashSet<string>(),
+                    };
+                    return newToken;
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                {
+
+                    int retryAfterMs = JsonDocument.Parse(content).RootElement.GetProperty("retry_after").GetInt32();
+                    Global.Log.Logger.Warning(
+                        @$"Rate limited. Attempting {3 - attempt} more times.
+                    Waiting {retryAfterMs}ms before retrying...");
+                    await Task.Delay(retryAfterMs);
+                    continue;
+
+                }
+                else
+                {
+                    Global.Log.Logger.Debug($"Error from Discord API while refreshing user Token: {content.ToString()}");
+                    return null;
+                }
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            Global.Log.Logger.Error(ex, $"Request failed: {ex.Message}");
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            Global.Log.Logger.Error(ex, $"JSON parsing failed: {ex.Message}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Global.Log.Logger.Error(ex, $"Unexpected error: {ex.Message}");
+            return null;
+        }
+        return null;
+    }
 
     /// <summary>
     /// Fetches the Username of the Token.
