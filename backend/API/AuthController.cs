@@ -139,19 +139,21 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Revokes all app sessions for the authenticated user (requires JWT).
+    /// Revokes all app sessions for the authenticated user (requires an active refresh token).
     /// </summary>
-    /// <param name="request">The revoke all request containing the JWT.</param>
+    /// <param name="request">The revoke all request containing a valid refresh token.</param>
     /// <returns>The number of sessions revoked.</returns>
     [HttpPost("revoke-all")]
     public async Task<IActionResult> RevokeAll([FromBody] RevokeAllRequest request)
     {
-        var principal = _jwtService.ValidateJwt(request.Jwt);
-        if (principal == null)
-            return Unauthorized(new { error = "Invalid or expired JWT" });
-        var discordId = principal.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
-        if (string.IsNullOrEmpty(discordId))
-            return Unauthorized(new { error = "Discord ID not found in JWT" });
+        var session = await _storage.GetSessionByRefreshTokenAsync(request.RefreshToken);
+        if (session == null || session.Revoked)
+            return Unauthorized(new { error = "Session revoked or not found" });
+
+        // Get the Discord ID from the valid session's token
+        var discordId = session.Token.DiscordID;
+        
+        // Revoke all sessions for this Discord ID
         var count = await _storage.RevokeAllSessionsByDiscordIdAsync(discordId);
         return Ok(new { revoked = count });
     }
@@ -234,8 +236,8 @@ public class RevokeRequest
 /// </summary>
 public class RevokeAllRequest
 {
-    /// <summary>The JWT of the user whose sessions should be revoked.</summary>
+    /// <summary>The refresh token of an active session.</summary>
     [Required]
-    public string Jwt { get; set; }
+    public string RefreshToken { get; set; }
 }
 
