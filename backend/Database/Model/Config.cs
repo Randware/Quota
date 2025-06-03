@@ -11,4 +11,6 @@ public class GuildConfig
     //TODO: discuss if there should be another option to allow comments for a certain time
 
     public Guild Guild { get; set; }
+    public ICollection<AllowedChannel> AllowedChannels { get; set; } = new List<AllowedChannel>();
+    public ICollection<Permission> Permissions { get; set; } = new List<Permission>();
 }

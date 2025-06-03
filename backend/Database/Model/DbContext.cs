@@ -111,7 +111,7 @@ public class QuotaContext : DbContext
             b.Property(ac => ac.Channel).IsRequired();
 
             b.HasOne(ac => ac.GuildConfig)
-             .WithMany(cfg => cfg.Guild.AllowedChannels)
+             .WithMany(cfg => cfg.AllowedChannels)
              .HasForeignKey(ac => ac.GuildConfigID)
              .OnDelete(DeleteBehavior.Cascade);
         });
@@ -119,12 +119,12 @@ public class QuotaContext : DbContext
         // Permission
         modelBuilder.Entity<Permission>(b =>
         {
-            b.HasKey(p => new { p.GuildConfigID, p.Role, p.PermissionType });
-            b.Property(p => p.Role).IsRequired();
+            b.HasKey(p => new { p.GuildConfigID, p.UserID, p.PermissionType });
+            b.Property(p => p.UserID).IsRequired();
             b.Property(p => p.PermissionType).HasConversion<string>();
 
             b.HasOne(p => p.GuildConfig)
-             .WithMany(cfg => cfg.Guild.Permissions)
+             .WithMany(cfg => cfg.Permissions)
              .HasForeignKey(p => p.GuildConfigID)
              .OnDelete(DeleteBehavior.Cascade);
         });

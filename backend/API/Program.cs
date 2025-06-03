@@ -5,6 +5,8 @@ using Microsoft.Extensions.Configuration;
 using API;
 using Database;
 using Common.OAuth;
+using Tomlyn;
+using Tomlyn.Model;
 
 namespace API;
 
@@ -17,12 +19,30 @@ public class Program
         await host.RunAsync();
     }
 
-    public static IHostBuilder CreateHostBuilder(string[] args) =>
-        Host.CreateDefaultBuilder(args)
+    public static IHostBuilder CreateHostBuilder(string[] args)
+    {
+        // Read port from config.toml
+        int port = 5000;
+        try
+        {
+            var toml = Toml.Parse(File.ReadAllText("./config.toml")).ToModel();
+            if (toml.ContainsKey("server") && toml["server"] is TomlTable serverSection && serverSection.ContainsKey("port"))
+            {
+                var portValue = serverSection["port"];
+                if (portValue is int)
+                    port = (int)portValue;
+                else if (portValue is long)
+                    port = (int)(long)portValue;
+                else if (portValue is string s && int.TryParse(s, out var parsed))
+                    port = parsed;
+            }
+        }
+        catch { /* fallback to default port */ }
+        return Host.CreateDefaultBuilder(args)
             .ConfigureWebHostDefaults(webBuilder =>
             {
                 webBuilder.UseStartup<Startup>();
-                webBuilder.UseUrls("http://localhost:5000");
+                webBuilder.UseUrls($"http://localhost:{port}");
             });
+    }
 }
-

@@ -13,7 +13,7 @@ public class Permission
     public Guid GuildConfigID { get; set; }
     public GuildConfig GuildConfig { get; set; }
 
-    public string Role { get; set; }
+    public string UserID { get; set; }
     public PermissionType PermissionType { get; set; }
 }
 

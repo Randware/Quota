@@ -1,0 +1,16 @@
+[jwt]
+secret = "your_jwt_secret"
+issuer = "your_issuer"
+audience = "your_audience"
+expiryMinutes = 60
+
+[oauth]
+id = "your_discord_client_id"
+secret = "your_discord_client_secret"
+apiEndpoint = "https://discord.com/api/v10"
+
+[openapi]
+enabled = true
+
+[server]
+port = 5000

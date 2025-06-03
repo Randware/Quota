@@ -1,16 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 using Database;
-using Database.Model;
 using Common.OAuth;
 using OAuth = Common.OAuth;
-using API = Common.OAuth.API;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
+using System.ComponentModel.DataAnnotations;
 
 namespace API;
 
+/// <summary>
+/// Handles authentication, session, and token management for the Randware Quota API.
+/// </summary>
 [ApiController]
 [Route("auth")]
 public class AuthController : ControllerBase
@@ -26,55 +24,55 @@ public class AuthController : ControllerBase
         _discordClient = discordClient;
     }
 
+    /// <summary>
+    /// Authenticates a user with a Discord OAuth2 code and issues a JWT and refresh token for the app.
+    /// </summary>
+    /// <param name="request">The login request containing the Discord OAuth2 code and redirect URI.</param>
+    /// <returns>JWT and refresh token for the app.</returns>
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        // Exchange code for Discord tokens
         var token = await OAuth.API.GetToken(request.Code, request.RedirectUri, _discordClient);
         if (token == null)
-            return BadRequest("Invalid code or Discord error");
-
-        // Fetch Discord user info
+            return BadRequest(new { error = "Invalid code or RedirectURI" });
         var discordUser = await OAuth.API.FetchUser(token.Value);
         if (discordUser == null)
-            return BadRequest("Could not fetch Discord user");
+            return BadRequest(new { error = "Could not fetch Discord user" });
 
-        // Check if DiscordToken exists
         var dbToken = await _storage.GetDiscordTokenByDiscordIdAsync(discordUser.Value.ID);
         if (dbToken == null)
         {
-            // Create new DiscordToken
             dbToken = await _storage.CreateDiscordTokenAsync(discordUser.Value, token.Value);
         }
         else
         {
-            // Update tokens if needed
             dbToken = await _storage.UpdateDiscordTokenAsync(dbToken, token.Value);
         }
 
-        // Create new session
-        var session = await _storage.CreateSessionAsync(dbToken.ID, token.Value.RefreshToken, token.Value.ExpiresIn);
-
-        // Generate JWT
-        var jwt = _jwtService.GenerateJwt(discordUser.Value.ID, session.ID);
+        // Generate a new random refresh token for the app session
+        var appRefreshToken = Guid.NewGuid().ToString();
+        var session = await _storage.CreateSessionAsync(dbToken.ID, appRefreshToken, token.Value.ExpiresIn);
+        // Get all guilds where user has SETTINGS permission
+        var allowedGuilds = await GetAllowedGuilds(discordUser.Value.ID);
+        var jwt = _jwtService.GenerateJwt(discordUser.Value.ID, session.ID, allowedGuilds);
 
         return Ok(new AuthResponse { Jwt = jwt, RefreshToken = session.RefreshToken });
     }
 
+    /// <summary>
+    /// Refreshes the app's JWT and refresh token using a valid refresh token. Also refreshes the Discord token if needed.
+    /// </summary>
+    /// <param name="request">The refresh request containing the app's refresh token.</param>
+    /// <returns>New JWT and refresh token for the app.</returns>
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
     {
-        // Find session by refresh token
         var session = await _storage.GetSessionByRefreshTokenAsync(request.RefreshToken);
         if (session == null || session.Revoked)
-            return Unauthorized("Session revoked or not found");
+            return Unauthorized(new { error = "Session revoked or not found" });
 
-        // Check permissions (implement your logic here)
-        if (!await _storage.HasPermissionAsync(session.Token.DiscordID, PermissionType.GET))
-            return Forbid("Insufficient permissions");
-
-        // Refresh Discord token if needed
         var dbToken = session.Token;
+        // Step 1: Refresh Discord token if needed
         if (dbToken.ExpiresAt <= DateTime.UtcNow)
         {
             var refreshed = await OAuth.API.RefreshToken(new Token
@@ -84,34 +82,160 @@ public class AuthController : ControllerBase
                 TokenType = "Bearer",
                 ExpiresIn = (long)(dbToken.ExpiresAt - dbToken.CreatedAt).TotalSeconds,
                 CreatedAt = dbToken.CreatedAt,
-                Scope = new HashSet<string>()
+                Scope = (dbToken.Scope ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries).ToHashSet()
             }, _discordClient);
             if (refreshed == null)
-                return Unauthorized("Could not refresh Discord token");
+                return Unauthorized(new { error = "Could not refresh Discord token" });
             dbToken = await _storage.UpdateDiscordTokenAsync(dbToken, refreshed.Value);
         }
 
-        // Issue new session and JWT
-        var newSession = await _storage.CreateSessionAsync(dbToken.ID, dbToken.RefreshToken, (long)(dbToken.ExpiresAt - DateTime.UtcNow).TotalSeconds);
-        var jwt = _jwtService.GenerateJwt(dbToken.DiscordID, newSession.ID);
+        // Step 2: Revoke the old app session
+        session.Revoked = true;
+        await _storage.UpdateSessionAsync(session);
+
+        // Step 3: Create a new app session with a new random refresh token
+        var newAppRefreshToken = Guid.NewGuid().ToString();
+        var newSession = await _storage.CreateSessionAsync(dbToken.ID, newAppRefreshToken, (long)(dbToken.ExpiresAt - DateTime.UtcNow).TotalSeconds);
+
+        // Step 4: Issue new JWT and refresh token for the app
+        var allowedGuilds = await GetAllowedGuilds(dbToken.DiscordID);
+        var jwt = _jwtService.GenerateJwt(dbToken.DiscordID, newSession.ID, allowedGuilds);
         return Ok(new AuthResponse { Jwt = jwt, RefreshToken = newSession.RefreshToken });
+    }
+
+    /// <summary>
+    /// Verifies the validity of a JWT.
+    /// </summary>
+    /// <param name="request">The verify request containing the JWT.</param>
+    /// <returns>Whether the JWT is valid and its claims.</returns>
+    [HttpPost("verify")]
+    public IActionResult Verify([FromBody] VerifyRequest request)
+    {
+        try
+        {
+            var principal = _jwtService.ValidateJwt(request.Jwt);
+            if (principal == null)
+                return Unauthorized(new { error = "Invalid or expired JWT" });
+            return Ok(new { valid = true, claims = principal.Claims.Select(c => new { c.Type, c.Value }) });
+        }
+        catch (Exception ex)
+        {
+            return Unauthorized(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Revokes a specific app session by its refresh token.
+    /// </summary>
+    /// <param name="request">The revoke request containing the refresh token.</param>
+    /// <returns>Success or not found.</returns>
+    [HttpPost("revoke")]
+    public async Task<IActionResult> Revoke([FromBody] RevokeRequest request)
+    {
+        var result = await _storage.RevokeSessionByRefreshTokenAsync(request.RefreshToken);
+        if (!result)
+            return NotFound(new { error = "Session not found or already revoked" });
+        return Ok(new { success = true });
+    }
+
+    /// <summary>
+    /// Revokes all app sessions for the authenticated user (requires JWT).
+    /// </summary>
+    /// <param name="request">The revoke all request containing the JWT.</param>
+    /// <returns>The number of sessions revoked.</returns>
+    [HttpPost("revoke-all")]
+    public async Task<IActionResult> RevokeAll([FromBody] RevokeAllRequest request)
+    {
+        var principal = _jwtService.ValidateJwt(request.Jwt);
+        if (principal == null)
+            return Unauthorized(new { error = "Invalid or expired JWT" });
+        var discordId = principal.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+        if (string.IsNullOrEmpty(discordId))
+            return Unauthorized(new { error = "Discord ID not found in JWT" });
+        var count = await _storage.RevokeAllSessionsByDiscordIdAsync(discordId);
+        return Ok(new { revoked = count });
+    }
+
+    // Helper to get all guilds where user has SETTINGS permission
+    private async Task<IEnumerable<string>> GetAllowedGuilds(string discordId)
+    {
+        var allowedGuilds = new List<string>();
+        var user = await _storage.GetUserByDiscordIdAsync(discordId);
+        if (user == null) return allowedGuilds;
+        var guilds = await _storage.GetAllGuildsWithPermissionsAsync();
+        foreach (var guild in guilds)
+        {
+            if (guild.Config?.Permissions != null &&
+                guild.Config.Permissions.Any(p => p.UserID == user.DiscordID && p.PermissionType.ToString() == "SETTINGS"))
+            {
+                allowedGuilds.Add(guild.DiscordID);
+            }
+        }
+        return allowedGuilds;
     }
 }
 
+/// <summary>
+/// Request for logging in with Discord OAuth2.
+/// </summary>
 public class LoginRequest
 {
+    /// <summary>The Discord OAuth2 code.</summary>
+    [Required]
     public string Code { get; set; }
+    /// <summary>The redirect URI used in the OAuth2 flow.</summary>
+    [Required]
     public string RedirectUri { get; set; }
 }
 
+/// <summary>
+/// Request for refreshing the app's JWT and refresh token.
+/// </summary>
 public class RefreshRequest
 {
+    /// <summary>The app's refresh token.</summary>
+    [Required]
     public string RefreshToken { get; set; }
 }
 
+/// <summary>
+/// Response containing the app's JWT and refresh token.
+/// </summary>
 public class AuthResponse
 {
+    /// <summary>The app's JWT (access token).</summary>
     public string Jwt { get; set; }
+    /// <summary>The app's refresh token.</summary>
     public string RefreshToken { get; set; }
+}
+
+/// <summary>
+/// Request for verifying a JWT.
+/// </summary>
+public class VerifyRequest
+{
+    /// <summary>The JWT to verify.</summary>
+    [Required]
+    public string Jwt { get; set; }
+}
+
+/// <summary>
+/// Request for revoking a specific session by refresh token.
+/// </summary>
+public class RevokeRequest
+{
+    /// <summary>The refresh token of the session to revoke.</summary>
+    [Required]
+    public string RefreshToken { get; set; }
+}
+
+/// <summary>
+/// Request for revoking all sessions for the authenticated user.
+/// </summary>
+public class RevokeAllRequest
+{
+    /// <summary>The JWT of the user whose sessions should be revoked.</summary>
+    [Required]
+    public string Jwt { get; set; }
 }
 
