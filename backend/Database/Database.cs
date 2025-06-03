@@ -61,6 +61,10 @@ public class Storage
         {
             try
             {
+                // Clear the change tracker to start fresh
+                _context.ChangeTracker.Clear();
+
+                // Get fresh copy of user from database with related data
                 var existingUser = await _context.Users
                     .Include(u => u.QuoteeProfiles)
                     .FirstOrDefaultAsync(u => u.ID == user.ID);
@@ -71,26 +75,58 @@ public class Storage
                     return null;
                 }
 
-                // Update the existing user's properties
+                // Update basic user properties
                 _context.Entry(existingUser).CurrentValues.SetValues(user);
 
-                // Handle quotee profiles
-                foreach (var quotee in user.QuoteeProfiles)
+                // Handle new quotee profiles
+                foreach (var newQuotee in user.QuoteeProfiles)
                 {
-                    var existingQuotee = existingUser.QuoteeProfiles.FirstOrDefault(q => q.ID == quotee.ID);
+                    // Check if this quotee already exists
+                    var existingQuotee = existingUser.QuoteeProfiles
+                        .FirstOrDefault(q => q.ID == newQuotee.ID);
+
                     if (existingQuotee == null)
                     {
-                        existingUser.QuoteeProfiles.Add(quotee);
+                        // This is a new quotee - create and add it
+                        var quoteeToAdd = new Quotee
+                        {
+                            ID = newQuotee.ID,
+                            Name = newQuotee.Name,
+                            UserID = existingUser.ID,
+                            User = existingUser
+                        };
+                        _context.Set<Quotee>().Add(quoteeToAdd);
+                        existingUser.QuoteeProfiles.Add(quoteeToAdd);
+                    }
+                    else
+                    {
+                        // Update existing quotee
+                        _context.Entry(existingQuotee).CurrentValues.SetValues(newQuotee);
                     }
                 }
 
-                await _context.SaveChangesAsync();
-                return existingUser;
+                try
+                {
+                    await _context.SaveChangesAsync();
+                    
+                    // Reload the user to get the updated data
+                    await _context.Entry(existingUser).ReloadAsync();
+                    await _context.Entry(existingUser)
+                        .Collection(u => u.QuoteeProfiles)
+                        .LoadAsync();
+                        
+                    return existingUser;
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    Log.Logger.Warning("Concurrency conflict while updating user {UserId}", user.ID);
+                    return null;
+                }
             }
-            catch (DbUpdateConcurrencyException ex)
+            catch (Exception ex)
             {
-                Log.Logger.Warning(ex, "Concurrency conflict while updating user {UserId}", user.ID);
-                return null;
+                Log.Logger.Error(ex, "Error during user update for {UserId}", user.ID);
+                throw;
             }
         });
     }
@@ -118,7 +154,43 @@ public class Storage
     {
         return await LoggedOperation("creating quote", async () =>
         {
-            quote.ID = Guid.NewGuid();
+            // Clear any tracking to avoid conflicts
+            _context.ChangeTracker.Clear();
+
+            // Ensure we have the related entities
+            var guild = await _context.Guilds.FindAsync(quote.GuildID);
+            var submitter = await _context.Users.FindAsync(quote.SubmittedByID);
+
+            if (guild == null || submitter == null)
+            {
+                throw new InvalidOperationException("Required related entities not found");
+            }
+
+            // Handle QuoteQuotee relationships
+            if (quote.QuoteQuotees != null)
+            {
+                foreach (var qq in quote.QuoteQuotees)
+                {
+                    // For non-Discord users, we need to save the quotee first
+                    if (qq.Quotee.UserID == null)
+                    {
+                        _context.Set<Quotee>().Add(qq.Quotee);
+                        await _context.SaveChangesAsync();
+                    }
+                    else
+                    {
+                        // For Discord users, ensure the Quotee exists
+                        var quotee = await _context.Set<Quotee>().FindAsync(qq.QuoteeID);
+                        if (quotee == null)
+                        {
+                            throw new InvalidOperationException($"Quotee {qq.QuoteeID} not found");
+                        }
+                        qq.Quotee = quotee;
+                    }
+                    qq.QuoteID = quote.ID;
+                }
+            }
+
             _context.Quotes.Add(quote);
             await _context.SaveChangesAsync();
             return quote;

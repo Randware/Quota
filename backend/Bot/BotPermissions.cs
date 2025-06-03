@@ -18,7 +18,7 @@ public static class BotPermissions
         addReactions: true,
         viewGuildInsights: true,
         manageGuild: true,
-        banMembers:true
+        banMembers: true
     );
 
     /// <summary>

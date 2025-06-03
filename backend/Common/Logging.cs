@@ -136,7 +136,6 @@ public static class Log
                 .WriteTo.Console(outputTemplate: 
                     "[{Timestamp:HH:mm:ss} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}")
                 .WriteTo.File(latest,
-                    rollingInterval: RollingInterval.Day,
                     outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
 
             _logger = loggerConfig.CreateLogger();

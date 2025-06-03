@@ -17,7 +17,7 @@ public class QuotaBot
     private readonly Storage _storage;
     private bool _isReady = false;
 
-    public QuotaBot(Storage storage)
+    public QuotaBot(IServiceProvider services)
     {
         var config = new DiscordSocketConfig
         {
@@ -27,14 +27,8 @@ public class QuotaBot
 
         _client = new DiscordSocketClient(config);
         _interactions = new InteractionService(_client);
-        _storage = storage;
-
-        var services = new ServiceCollection()
-            .AddSingleton(_client)
-            .AddSingleton(_interactions)
-            .AddSingleton(_storage);
-        
-        _services = services.BuildServiceProvider();
+        _services = services;
+        _storage = _services.GetRequiredService<Storage>();
 
         // Set up logging
         _client.Log += LogDiscordMessage;
@@ -72,6 +66,8 @@ public class QuotaBot
         _client.GuildAvailable += OnGuildAvailable;
         _client.UserUpdated += OnUserUpdated;
         _client.GuildMemberUpdated += OnGuildMemberUpdated;
+        _client.UserJoined += OnUserJoined;
+        _client.UserLeft += OnUserLeft;
 
         // Handle interactions after commands are registered
         _client.InteractionCreated += async (interaction) =>
@@ -91,26 +87,27 @@ public class QuotaBot
         await _client.StartAsync();
     }
 
-    private async Task OnReady()
+    private Task OnReady()
     {
         try
         {
             using (LogContext.PushProperty("SourceContext", "Discord.Bot"))
             {
                 Log.Logger.Information("Bot is connected and ready!");
-                
+                _isReady = true;
                 // Register commands globally
-                await _interactions.RegisterCommandsGloballyAsync();
+                _ = _interactions.RegisterCommandsGloballyAsync();
                 Log.Logger.Information("Successfully registered global commands");
-
-                // Initial sync of all guilds
+                // Initial sync of all guilds in background, each with its own scope
                 foreach (var guild in _client.Guilds)
                 {
-                    await SyncGuildPermissions(guild);
+                    _ = Task.Run(async () =>
+                    {
+                        using var scope = _services.CreateScope();
+                        var storage = scope.ServiceProvider.GetRequiredService<Storage>();
+                        await SyncGuildPermissions(guild, storage);
+                    });
                 }
-
-                // Mark bot as ready to handle commands
-                _isReady = true;
                 Log.Logger.Information("Bot is now ready to handle commands");
             }
         }
@@ -119,18 +116,25 @@ public class QuotaBot
             Log.Logger.Error(ex, "Failed to complete ready sequence");
             _isReady = false;
         }
+        return Task.CompletedTask;
     }
 
     private async Task OnJoinedGuild(SocketGuild guild)
     {
         Log.Logger.Information("Joined new guild: {GuildName} ({GuildId})", guild.Name, guild.Id);
-        await SyncGuildPermissions(guild);
+        await SyncGuildPermissions(guild, _storage);
     }
 
-    private async Task OnGuildAvailable(SocketGuild guild)
+    private Task OnGuildAvailable(SocketGuild guild)
     {
         Log.Logger.Information("Guild became available: {GuildName} ({GuildId})", guild.Name, guild.Id);
-        await SyncGuildPermissions(guild);
+        _ = Task.Run(async () =>
+        {
+            using var scope = _services.CreateScope();
+            var storage = scope.ServiceProvider.GetRequiredService<Storage>();
+            await SyncGuildPermissions(guild, storage);
+        });
+        return Task.CompletedTask;
     }
 
     private async Task OnUserUpdated(SocketUser before, SocketUser after)
@@ -140,24 +144,43 @@ public class QuotaBot
             var guildUser = guild.GetUser(after.Id);
             if (guildUser != null)
             {
-                await UpdateUserPermissions(guildUser);
+                await UpdateUserPermissions(guildUser, _storage);
             }
         }
     }
 
     private async Task OnGuildMemberUpdated(Cacheable<SocketGuildUser, ulong> before, SocketGuildUser after)
     {
-        await UpdateUserPermissions(after);
+        await UpdateUserPermissions(after, _storage);
     }
 
-    private async Task SyncGuildPermissions(SocketGuild guild)
+    private async Task OnUserJoined(SocketGuildUser user)
+    {
+        // Add user to permissions table if needed (e.g., default permissions or based on roles)
+        await UpdateUserPermissions(user, _storage);
+    }
+
+    private async Task OnUserLeft(SocketGuild guild, SocketUser user)
+    {
+        // Remove user from permissions table
+        using var scope = _services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<QuotaContext>();
+        var dbGuildConfig = db.GuildConfigs.FirstOrDefault(gc => gc.Guild.DiscordID == guild.Id.ToString());
+        if (dbGuildConfig == null) return;
+        var permissions = db.Permissions.Where(p => p.GuildConfigID == dbGuildConfig.ID && p.UserID == user.Id.ToString());
+        db.Permissions.RemoveRange(permissions);
+        await db.SaveChangesAsync();
+    }
+
+    private async Task SyncGuildPermissions(SocketGuild guild, Storage storage)
     {
         try
         {
-            var dbGuild = await _storage.GetGuildByDiscordIdAsync(guild.Id.ToString());
+            await guild.DownloadUsersAsync(); 
+            var dbGuild = await storage.GetGuildByDiscordIdAsync(guild.Id.ToString());
             if (dbGuild == null)
             {
-                dbGuild = await _storage.CreateGuildAsync(new Guild
+                dbGuild = await storage.CreateGuildAsync(new Guild
                 {
                     DiscordID = guild.Id.ToString(),
                     Config = new GuildConfig
@@ -174,7 +197,7 @@ public class QuotaBot
             // Update permissions for all users with manage bot or admin permissions
             foreach (var user in guild.Users)
             {
-                await UpdateUserPermissions(user);
+                await UpdateUserPermissions(user, storage);
             }
         }
         catch (Exception ex)
@@ -183,52 +206,84 @@ public class QuotaBot
         }
     }
 
-    private async Task UpdateUserPermissions(SocketGuildUser user)
+    private async Task UpdateUserPermissions(SocketGuildUser user, Storage storage)
     {
         try
         {
             var guild = user.Guild;
-            var dbGuild = await _storage.GetGuildByDiscordIdAsync(guild.Id.ToString());
+            var dbGuild = await storage.GetGuildByDiscordIdAsync(guild.Id.ToString());
             if (dbGuild?.Config == null) return;
 
-            bool hasManageBot = user.GuildPermissions.ManageGuild || user.GuildPermissions.Administrator;
-            
-            // Check if permission already exists
-            var existingPerm = dbGuild.Config.Permissions
-                .FirstOrDefault(p => p.UserID == user.Id.ToString() && 
-                                   p.PermissionType == PermissionType.SETTINGS);
+            // Handle DASHBOARD and ADMIN permissions for users
+            bool isAdmin = user.GuildPermissions.Administrator;
+            bool hasDashboard = user.GuildPermissions.ManageGuild || isAdmin;
 
-            if (hasManageBot && existingPerm == null)
+            // Remove old SETTINGS permission if present
+            var oldSettingPerm = dbGuild.Config.Permissions.FirstOrDefault(p => p.UserID == user.Id.ToString() && p.PermissionType.ToString() == "SETTINGS");
+            if (oldSettingPerm != null)
+                dbGuild.Config.Permissions.Remove(oldSettingPerm);
+
+            // DASHBOARD permission
+            var dashboardPerm = dbGuild.Config.Permissions.FirstOrDefault(p => p.UserID == user.Id.ToString() && p.PermissionType == PermissionType.DASHBOARD);
+            if (hasDashboard && dashboardPerm == null)
             {
-                // Add permission
                 dbGuild.Config.Permissions.Add(new Permission
                 {
                     GuildConfigID = dbGuild.Config.ID,
                     UserID = user.Id.ToString(),
-                    PermissionType = PermissionType.SETTINGS
+                    PermissionType = PermissionType.DASHBOARD
                 });
-                await _storage.UpdateGuildAsync(dbGuild);
-                Log.Logger.Information("Added SETTINGS permission for user {UserId} in guild {GuildId}", 
-                    user.Id, guild.Id);
             }
-            else if (!hasManageBot && existingPerm != null)
+            else if (!hasDashboard && dashboardPerm != null)
             {
-                // Remove permission
-                dbGuild.Config.Permissions.Remove(existingPerm);
-                await _storage.UpdateGuildAsync(dbGuild);
-                Log.Logger.Information("Removed SETTINGS permission for user {UserId} in guild {GuildId}", 
-                    user.Id, guild.Id);
+                dbGuild.Config.Permissions.Remove(dashboardPerm);
             }
+
+            // ADMIN permission
+            var adminPerm = dbGuild.Config.Permissions.FirstOrDefault(p => p.UserID == user.Id.ToString() && p.PermissionType == PermissionType.ADMIN);
+            if (isAdmin && adminPerm == null)
+            {
+                dbGuild.Config.Permissions.Add(new Permission
+                {
+                    GuildConfigID = dbGuild.Config.ID,
+                    UserID = user.Id.ToString(),
+                    PermissionType = PermissionType.ADMIN
+                });
+            }
+            else if (!isAdmin && adminPerm != null)
+            {
+                dbGuild.Config.Permissions.Remove(adminPerm);
+            }
+
+            // Role-based permissions (example: MANAGE_QUOTES)
+            foreach (var role in user.Roles)
+            {
+                // Example: assign MANAGE_QUOTES to a specific role name or ID
+                if (role.Name == "Quote Manager")
+                {
+                    var rolePerm = dbGuild.Config.Permissions.FirstOrDefault(p => p.RoleID == role.Id.ToString() && p.PermissionType == PermissionType.MANAGE_QUOTES);
+                    if (rolePerm == null)
+                    {
+                        dbGuild.Config.Permissions.Add(new Permission
+                        {
+                            GuildConfigID = dbGuild.Config.ID,
+                            RoleID = role.Id.ToString(),
+                            PermissionType = PermissionType.MANAGE_QUOTES
+                        });
+                    }
+                }
+            }
+
+            await storage.UpdateGuildAsync(dbGuild);
         }
         catch (Exception ex)
         {
-            Log.Logger.Error(ex, "Failed to update permissions for user {UserId} in guild {GuildId}", 
-                user.Id, user.Guild.Id);
+            Log.Logger.Error(ex, "Failed to update permissions for user {UserId} in guild {GuildId}", user.Id, user.Guild.Id);
         }
     }
 
     // API Helper Methods
-    
+
     /// <summary>
     /// Gets all channels in a guild
     /// </summary>
@@ -254,3 +309,6 @@ public class QuotaBot
         await _client.StopAsync();
     }
 }
+
+
+

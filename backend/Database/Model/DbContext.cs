@@ -12,6 +12,7 @@ public class QuotaContext : DbContext
     public DbSet<AllowedChannel> AllowedChannels { get; set; }
     public DbSet<Permission> Permissions { get; set; }
     public DbSet<Session> Sessions { get; set; }
+    public DbSet<QuoteVote> QuoteVotes { get; set; }
 
     /// <summary>
     /// Create a new DbContext with the provided options
@@ -33,7 +34,8 @@ public class QuotaContext : DbContext
         {
             b.HasKey(q => q.ID);
             b.Property(q => q.MessageID).IsRequired();
-            b.Property(q => q.Content).IsRequired();
+            b.Property(q => q.Content).IsRequired(false);
+            b.Property(q => q.MediaUrls).IsRequired(false);
             b.Property(q => q.Upvotes).IsRequired();
             b.Property(q => q.Downvotes).IsRequired();
             b.Property(q => q.CreatedAt);
@@ -119,14 +121,25 @@ public class QuotaContext : DbContext
         // Permission
         modelBuilder.Entity<Permission>(b =>
         {
-            b.HasKey(p => new { p.GuildConfigID, p.UserID, p.PermissionType });
-            b.Property(p => p.UserID).IsRequired();
+            b.HasKey(p => p.ID);  
+            b.Property(p => p.UserID).IsRequired(false);
+            b.Property(p => p.RoleID).IsRequired(false);
             b.Property(p => p.PermissionType).HasConversion<string>();
 
             b.HasOne(p => p.GuildConfig)
              .WithMany(cfg => cfg.Permissions)
              .HasForeignKey(p => p.GuildConfigID)
              .OnDelete(DeleteBehavior.Cascade);
+
+            // Unique index for user-based permissions
+            b.HasIndex(p => new { p.GuildConfigID, p.PermissionType, p.UserID })
+                .IsUnique()
+                .HasFilter(null); 
+
+            // Unique index for role-based permissions
+            b.HasIndex(p => new { p.GuildConfigID, p.PermissionType, p.RoleID })
+                .IsUnique()
+                .HasFilter(null);
         });
 
         // DiscordToken
@@ -155,6 +168,21 @@ public class QuotaContext : DbContext
                        .HasForeignKey(s => s.TokenID)
                        .IsRequired()
                        .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // QuoteVote (per-user voting)
+        modelBuilder.Entity<QuoteVote>(b =>
+        {
+            b.HasKey(qv => new { qv.QuoteID, qv.UserID });
+            b.HasOne(qv => qv.Quote)
+                .WithMany()
+                .HasForeignKey(qv => qv.QuoteID)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(qv => qv.User)
+                .WithMany()
+                .HasForeignKey(qv => qv.UserID)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.Property(qv => qv.IsUpvote).IsRequired();
         });
     }
 }
