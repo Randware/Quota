@@ -45,6 +45,7 @@
 		"@emoji-mart/data": "^1.2.1",
 		"@fontsource-variable/roboto": "^5.2.5",
 		"@twemoji/api": "^16.0.1",
+		"cache-manager": "^6.4.3",
 		"emoji-mart": "^5.6.0",
 		"lucide-svelte": "^0.506.0",
 		"svelte-floating-ui": "^1.6.2"

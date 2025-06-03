@@ -1,6 +1,8 @@
 import { redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 import type { Guild } from '$lib/server/types';
+import { getGuildStats } from '$lib/server/stats';
+import { getGuildSettings } from '$lib/server/settings';
 
 export const load: LayoutServerLoad = async ({ params, parent }) => {
   const guildId: string = params.slug;
@@ -11,5 +13,9 @@ export const load: LayoutServerLoad = async ({ params, parent }) => {
     throw redirect(303, '/dashboard');
   }
 
-  return { guild };
+  const stats = await getGuildStats(guild);
+
+  const settings = await getGuildSettings(guild);
+
+  return { guild, stats, settings };
 };

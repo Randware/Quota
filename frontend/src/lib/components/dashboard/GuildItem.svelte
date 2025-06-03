@@ -7,17 +7,17 @@
 
 	let { guild }: { guild: Guild } = $props<{ guild: Guild }>();
 
-	let displayFallback = $state(false);
+	let displayBackground = $state(true);
 </script>
 
 <div class="w-full max-w-80 overflow-hidden rounded-xl">
 	<div class="bg-highlight relative aspect-video overflow-hidden">
-		{#if !displayFallback}
+		{#if displayBackground}
 			<img
 				src={guild.icon}
 				alt=""
 				class="absolute inset-0 h-full w-full object-cover blur-md brightness-75"
-				onerror={() => (displayFallback = true)}
+				onerror={() => (displayBackground = false)}
 			/>
 		{/if}
 

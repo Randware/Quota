@@ -1,0 +1,35 @@
+<script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import type { Guild, Settings } from '$lib/server/types';
+	import ButtonPrimary from '../ui/ButtonPrimary.svelte';
+
+	let guild: Guild = $derived(page.data.guild);
+	let settings: Settings = $derived(page.data.settings);
+</script>
+
+<div class="bg-dark flex flex-col gap-6 rounded-xl p-4">
+	<div class="text-light text-2xl font-semibold">
+		<span class="text-primary">Enabled</span> features
+	</div>
+
+	<div class="mb-auto flex flex-wrap gap-2">
+		{#if settings.lockAllowedChannels}
+			<div class="bg-darker text-light text-md rounded-xl p-2 font-medium">
+				Lock allowed channels
+			</div>
+		{/if}
+
+		{#if settings.allowVoting}
+			<div class="bg-darker text-light text-md rounded-xl p-2 font-medium">Voting</div>
+		{/if}
+
+		{#if settings.comments}
+			<div class="bg-darker text-light text-md rounded-xl p-2 font-medium">Comments</div>
+		{/if}
+	</div>
+
+	<ButtonPrimary onclick={() => goto(`/dashboard/${guild.id}/settings`)}>
+		<div class="text-light px-4 py-2 font-semibold">Configure</div>
+	</ButtonPrimary>
+</div>

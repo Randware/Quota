@@ -1,3 +1,16 @@
+export interface Settings {
+  allowedChannels: string[];
+  lockAllowedChannels: boolean;
+  upvoteEmoji: string;
+  downvoteEmoji: string;
+  allowVoting: boolean;
+  comments: boolean;
+}
+
+export interface Stats {
+  totalQuotes: number;
+}
+
 export interface Session {
   auth_token: string;
   refresh_token: string;
