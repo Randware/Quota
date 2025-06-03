@@ -239,6 +239,32 @@ public class Storage
         }
     }
 
+    // Revoke a specific session by refresh token
+    public async Task<bool> RevokeSessionByRefreshTokenAsync(string refreshToken)
+    {
+        var session = await _context.Sessions.FirstOrDefaultAsync(s => s.RefreshToken == refreshToken);
+        if (session == null) return false;
+        session.Revoked = true;
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    // Revoke all sessions associated with a DiscordToken (by DiscordID)
+    public async Task<int> RevokeAllSessionsByDiscordIdAsync(string discordId)
+    {
+        var discordToken = await _context.Set<DiscordToken>().FirstOrDefaultAsync(dt => dt.DiscordID == discordId);
+        if (discordToken == null) return 0;
+        var sessions = _context.Sessions.Where(s => s.TokenID == discordToken.ID && !s.Revoked);
+        int count = 0;
+        await foreach (var session in sessions.AsAsyncEnumerable())
+        {
+            session.Revoked = true;
+            count++;
+        }
+        await _context.SaveChangesAsync();
+        return count;
+    }
+
     // GUILD CRUD
     public async Task<Guild?> GetGuildAsync(Guid guildId)
     {
@@ -301,6 +327,23 @@ public class Storage
         }
     }
 
+    // Returns all guilds with their configs and permissions included
+    public async Task<List<Guild>> GetAllGuildsWithPermissionsAsync()
+    {
+        try
+        {
+            return await _context.Guilds
+                .Include(g => g.Config)
+                .ThenInclude(cfg => cfg.Permissions)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Error(ex, "Error fetching all guilds with permissions");
+            return new List<Guild>();
+        }
+    }
+
     // DISCORD TOKEN CRUD
     public async Task<DiscordToken?> GetDiscordTokenByDiscordIdAsync(string discordId)
     {
@@ -324,7 +367,8 @@ public class Storage
             AccessToken = token.AccessToken,
             RefreshToken = token.RefreshToken,
             ExpiresAt = token.CreatedAt.AddSeconds(token.ExpiresIn),
-            CreatedAt = token.CreatedAt
+            CreatedAt = token.CreatedAt,
+            Scope = string.Join(" ", token.Scope) // Store scope as space-separated string
         };
         try
         {
@@ -345,6 +389,7 @@ public class Storage
         dbToken.RefreshToken = token.RefreshToken;
         dbToken.ExpiresAt = token.CreatedAt.AddSeconds(token.ExpiresIn);
         dbToken.CreatedAt = token.CreatedAt;
+        dbToken.Scope = string.Join(" ", token.Scope); // Update scope
         try
         {
             _context.Set<DiscordToken>().Update(dbToken);
@@ -366,11 +411,15 @@ public class Storage
             // Find user
             var user = await _context.Users.FirstOrDefaultAsync(u => u.DiscordID == discordId);
             if (user == null) return false;
-            // Find all guilds
-            var guilds = await _context.Guilds.Include(g => g.Permissions).ToListAsync();
+            // Find all guilds and include config and permissions
+            var guilds = await _context.Guilds
+                .Include(g => g.Config)
+                    .ThenInclude(cfg => cfg.Permissions)
+                .ToListAsync();
             foreach (var guild in guilds)
             {
-                foreach (var perm in guild.Permissions)
+                if (guild.Config == null) continue;
+                foreach (var perm in guild.Config.Permissions)
                 {
                     if (perm.PermissionType == permissionType)
                         return true;

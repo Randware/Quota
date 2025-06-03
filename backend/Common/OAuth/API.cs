@@ -21,17 +21,14 @@ public static class API
     /// </exception>
     public static async Task<User?> FetchUser(Token token)
     {
-        using HttpClient client = new();
-
-
         var response = await Fetch(endpoint: "https://discord.com/api/users/@me", transformers: httpClient =>
         {
-            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(token.TokenType, token.AccessToken);
+            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(token.TokenType, token.AccessToken);
         });
 
         if (response is null)
         {
-            Log.Logger.Debug("The user provided a wrong code");
+            Log.Logger.Debug("The provided token is wrong");
             // This assumes that every fetch error unrelated to HttpRequestException 
             // is due to a wrongly provided code.
             return null;
@@ -76,6 +73,9 @@ public static class API
     /// </exception>
     public static async Task<Token?> GetToken(string code, string redirectUri, Client client)
     {
+        // Remove trailing slash from redirectUri if present. (Discord does not like it)
+        if (!string.IsNullOrEmpty(redirectUri) && redirectUri.EndsWith("/"))
+            redirectUri = redirectUri.TrimEnd('/');
         var form = new FormUrlEncodedContent(new[] {
                 new KeyValuePair<string, string>("grant_type", "authorization_code"),
                 new KeyValuePair<string, string>("code", code),
@@ -268,7 +268,6 @@ public static class API
             Log.Logger.Error(ex, $"Unexpected error: {ex.Message}");
             return null;
         }
-
         return null;
     }
 
