@@ -10,4 +10,8 @@
     <PackageReference Include="Discord.Net" Version="3.17.4" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj" />
+  </ItemGroup>
+
 </Project>

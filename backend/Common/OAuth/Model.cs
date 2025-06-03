@@ -1,5 +1,4 @@
-
-namespace Global.OAuth;
+namespace Common.OAuth;
 //TODO: Merge to the DB model class
 
 ///<summary>
@@ -87,19 +86,11 @@ public readonly struct User
 /// <summary>
 /// Represents a Discord Client 
 /// </summary>
-public readonly struct Client
+public class Client
 {
     public string ID { get; init; }
     public string Secret { get; init; }
-    public string ApiEndpoint { get; init; } = "https://discord.com/api/v10";
-
-    // Required because defining any constructor disables the default one that applies field initializers.
-    public Client()
-    {
-        ID = "";
-        Secret = "";
-        ApiEndpoint = "https://discord.com/api/v10";
-    }
+    public string ApiEndpoint { get; init; }
 
     public Client(string id, string secret, string? apiEndpoint = null)
     {
@@ -107,9 +98,8 @@ public readonly struct Client
         Secret = secret ?? throw new ArgumentNullException(nameof(secret));
         var endpoint = (apiEndpoint ?? "https://discord.com/api/v10");
         ApiEndpoint = endpoint.EndsWith("/") ? endpoint[..^1] : endpoint;
-
     }
-
 
     public override string ToString() => $"Client {{\n\tID: {ID}\n\tSecret: {Secret}\n\tAPI Endpoint: {ApiEndpoint}\n}}";
 }
+

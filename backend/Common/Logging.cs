@@ -2,7 +2,7 @@ using System.IO.Compression;
 using Serilog;
 using Serilog.Exceptions;
 
-namespace Global;
+namespace Common;
 
 /// <summary>
 /// Provides Logging util utils

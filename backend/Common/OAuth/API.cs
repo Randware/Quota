@@ -1,8 +1,8 @@
-namespace Global.OAuth;
+namespace Common.OAuth;
 
 using System.Text.Json;
-using static Global.Util;
-using static Global.Log;
+using static Common.Util;
+using static Common.Log;
 
 //TODO: Remove the enormous amount of code duplicaiton. (I am way to lazy right now)
 
@@ -31,7 +31,7 @@ public static class API
 
         if (response is null)
         {
-            Global.Log.Logger.Debug("The user provided a wrong code");
+            Log.Logger.Debug("The user provided a wrong code");
             // This assumes that every fetch error unrelated to HttpRequestException 
             // is due to a wrongly provided code.
             return null;
@@ -46,7 +46,7 @@ public static class API
                 ID = doc.RootElement.GetProperty("id").GetString() ?? throw new NullReferenceException("The returned id is null"),
                 Username = doc.RootElement.GetProperty("username").GetString() ?? throw new NullReferenceException("The returned username is null"),
                 Avatar = doc.RootElement.GetProperty("avatar").GetString() ?? throw new NullReferenceException("The avatar is null"),
-                Premium = (Global.OAuth.User.Nitro)doc.RootElement.GetProperty("premium_type").GetSByte(),
+                Premium = (OAuth.User.Nitro)doc.RootElement.GetProperty("premium_type").GetSByte(),
                 GlobalName = doc.RootElement.GetProperty("global_name").GetString() ?? throw new NullReferenceException("The avatar is null"),
                 Mfa = doc.RootElement.GetProperty("mfa_enabled").GetBoolean(),
             };
@@ -55,7 +55,7 @@ public static class API
         }
         catch (NullReferenceException ex)
         {
-            Global.Log.Logger.Error(ex, $"Could not parse API response to User: {ex.Message}");
+            Log.Logger.Error(ex, $"Could not parse API response to User: {ex.Message}");
             throw;
         }
     }
@@ -156,7 +156,7 @@ public static class API
         }
         catch (NullReferenceException ex)
         {
-            Global.Log.Logger.Error(ex, $"Could not parse API response to Token: {ex.Message}");
+            Log.Logger.Error(ex, $"Could not parse API response to Token: {ex.Message}");
         }
         return null;
     }
@@ -239,7 +239,7 @@ public static class API
                 {
 
                     int retryAfterMs = JsonDocument.Parse(content).RootElement.GetProperty("retry_after").GetInt32();
-                    Global.Log.Logger.Warning(
+                    Log.Logger.Warning(
                         @$"Rate limited. Attempting {3 - attempt} more times.
                     Waiting {retryAfterMs}ms before retrying...");
                     await Task.Delay(retryAfterMs);
@@ -248,24 +248,24 @@ public static class API
                 }
                 else
                 {
-                    Global.Log.Logger.Debug($"Error while fetching {endpoint}: {content.ToString()}");
+                    Log.Logger.Debug($"Error while fetching {endpoint}: {content.ToString()}");
                     return null;
                 }
             }
         }
         catch (HttpRequestException ex)
         {
-            Global.Log.Logger.Error(ex, $"Request failed: {ex.Message}");
+            Log.Logger.Error(ex, $"Request failed: {ex.Message}");
             throw;
         }
         catch (JsonException ex)
         {
-            Global.Log.Logger.Error(ex, $"JSON parsing failed: {ex.Message}");
+            Log.Logger.Error(ex, $"JSON parsing failed: {ex.Message}");
             return null;
         }
         catch (Exception ex)
         {
-            Global.Log.Logger.Error(ex, $"Unexpected error: {ex.Message}");
+            Log.Logger.Error(ex, $"Unexpected error: {ex.Message}");
             return null;
         }
 
