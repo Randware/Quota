@@ -14,3 +14,6 @@ enabled = true
 
 [server]
 port = 5000
+
+[bot]
+token = "your_bot_token"

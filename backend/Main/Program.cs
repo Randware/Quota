@@ -1,23 +1,78 @@
 ﻿using System.Threading.Tasks;
-using Common.OAuth;
+using System.IO;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using Common;
+using Tomlyn;
+using Tomlyn.Model;
+using Serilog.Context;
 
 namespace Main;
 
 public class Program
 {
+    private static CancellationTokenSource? _cancellationTokenSource;
+
     public static async Task Main(string[] args)
     {
+        try
+        {
+            // Set up logging
+            Log.SetupLogging("logs");
+            using (LogContext.PushProperty("SourceContext", "Main.Startup"))
+            {
+                Log.Logger.Information("Starting Quota backend...");
 
+                // Read config
+                var toml = Toml.Parse(File.ReadAllText("./config.toml")).ToModel();
+                
+                // Get bot token
+                var botSection = toml["bot"] as TomlTable ?? throw new Exception("Missing [bot] section in config.toml");
+                var token = botSection["token"] as string ?? throw new Exception("Missing 'token' in [bot] section of config.toml");
 
-        Common.Log.SetupLogging("./logs");
-        // Start the API in a background task
-        var apiTask = Task.Run(() => API.Program.StartAsync());
+                _cancellationTokenSource = new CancellationTokenSource();
 
-        // You can start other services (e.g., Bot) here in the future
-        // var botTask = Task.Run(() => Bot.Program.StartAsync());
+                // Start API and Bot in separate tasks
+                var tasks = new List<Task>
+                {
+                    Task.Run(() => API.Program.StartAsync(args), _cancellationTokenSource.Token),
+                    Task.Run(() => Bot.Program.RunAsync(token), _cancellationTokenSource.Token)
+                };
 
-        Console.WriteLine("System started. Press Ctrl+C to exit.");
-        await apiTask;
+                // Handle shutdown gracefully
+                Console.CancelKeyPress += (sender, e) =>
+                {
+                    e.Cancel = true; // Prevent immediate termination
+                    using (LogContext.PushProperty("SourceContext", "Main.Shutdown"))
+                    {
+                        Log.Logger.Information("Received shutdown signal, initiating graceful shutdown...");
+                        _cancellationTokenSource?.Cancel();
+                    }
+                };
+
+                AppDomain.CurrentDomain.ProcessExit += (sender, e) =>
+                {
+                    using (LogContext.PushProperty("SourceContext", "Main.Shutdown"))
+                    {
+                        Log.Logger.Information("Process exit requested, waiting for tasks to complete...");
+                        _cancellationTokenSource?.Cancel();
+                        Task.WhenAll(tasks).Wait(TimeSpan.FromSeconds(5));
+                        Log.Logger.Information("Shutdown complete");
+                    }
+                };
+
+                // Wait for both tasks to complete or cancellation
+                await Task.WhenAll(tasks);
+            }
+        }
+        catch (Exception ex)
+        {
+            using (LogContext.PushProperty("SourceContext", "Main.Startup"))
+            {
+                Log.Logger.Fatal(ex, "Fatal error in application startup");
+            }
+            throw;
+        }
     }
 }
-

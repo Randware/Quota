@@ -3,9 +3,8 @@ namespace Database.Model;
 public enum PermissionType
 {
     SETTINGS,
-    CREATE,
-    DELETE,
-    GET
+    ADMIN,
+    MANAGE_QUOTES,
 }
 
 public class Permission
@@ -16,4 +15,3 @@ public class Permission
     public string UserID { get; set; }
     public PermissionType PermissionType { get; set; }
 }
-

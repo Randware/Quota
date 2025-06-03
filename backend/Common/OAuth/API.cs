@@ -1,3 +1,5 @@
+using Serilog.Context;
+
 namespace Common.OAuth;
 
 using System.Text.Json;
@@ -218,54 +220,67 @@ public static class API
             {
                 transformer(httpClient);
             }
-            //TODO: Make retry attempts configurable
-            for (int attempt = 0; attempt < 3; attempt++)
+            
+            using (LogContext.PushProperty("SourceContext", "Discord.OAuth"))
             {
-                HttpResponseMessage response = null!;
-                if (form is null)
+                //TODO: Make retry attempts configurable
+                for (int attempt = 0; attempt < 3; attempt++)
                 {
-                    response = await httpClient.GetAsync(endpoint);
-                }
-                else
-                {
-                    response = await httpClient.PostAsync(endpoint, form);
-                }
-                string content = await response.Content.ReadAsStringAsync();
-                if (response.IsSuccessStatusCode)
-                {
-                    return response;
-                }
-                else if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-                {
+                    HttpResponseMessage response = null!;
+                    if (form is null)
+                    {
+                        response = await httpClient.GetAsync(endpoint);
+                    }
+                    else
+                    {
+                        response = await httpClient.PostAsync(endpoint, form);
+                    }
+                    string content = await response.Content.ReadAsStringAsync();
+                    if (response.IsSuccessStatusCode)
+                    {
+                        return response;
+                    }
+                    else if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                    {
 
-                    int retryAfterMs = JsonDocument.Parse(content).RootElement.GetProperty("retry_after").GetInt32();
-                    Log.Logger.Warning(
-                        @$"Rate limited. Attempting {3 - attempt} more times.
-                    Waiting {retryAfterMs}ms before retrying...");
-                    await Task.Delay(retryAfterMs);
-                    continue;
+                        int retryAfterMs = JsonDocument.Parse(content).RootElement.GetProperty("retry_after").GetInt32();
+                        Log.Logger.Warning(
+                            "Rate limited while accessing {Endpoint}. Attempting {AttemptsLeft} more times. Waiting {RetryAfter}ms before retrying...",
+                            endpoint, 3 - attempt, retryAfterMs);
+                        await Task.Delay(retryAfterMs);
+                        continue;
 
-                }
-                else
-                {
-                    Log.Logger.Debug($"Error while fetching {endpoint}: {content.ToString()}");
-                    return null;
+                    }
+                    else
+                    {
+                        Log.Logger.Debug("Error while fetching {Endpoint}: {Content}", endpoint, content);
+                        return null;
+                    }
                 }
             }
         }
         catch (HttpRequestException ex)
         {
-            Log.Logger.Error(ex, $"Request failed: {ex.Message}");
+            using (LogContext.PushProperty("SourceContext", "Discord.OAuth"))
+            {
+                Log.Logger.Error(ex, "Request to {Endpoint} failed: {Message}", endpoint, ex.Message);
+            }
             throw;
         }
         catch (JsonException ex)
         {
-            Log.Logger.Error(ex, $"JSON parsing failed: {ex.Message}");
+            using (LogContext.PushProperty("SourceContext", "Discord.OAuth"))
+            {
+                Log.Logger.Error(ex, "JSON parsing failed for {Endpoint}: {Message}", endpoint, ex.Message);
+            }
             return null;
         }
         catch (Exception ex)
         {
-            Log.Logger.Error(ex, $"Unexpected error: {ex.Message}");
+            using (LogContext.PushProperty("SourceContext", "Discord.OAuth"))
+            {
+                Log.Logger.Error(ex, "Unexpected error accessing {Endpoint}: {Message}", endpoint, ex.Message);
+            }
             return null;
         }
         return null;
