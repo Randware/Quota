@@ -9,6 +9,7 @@ namespace Bot;
 
 public class Program
 {
+    private readonly IServiceProvider _serviceProvider;
     private readonly QuotaBot _bot;
     private readonly string _token;
 
@@ -25,11 +26,10 @@ public class Program
         services.AddScoped<Storage>();
 
         // Build service provider and get storage
-        var serviceProvider = services.BuildServiceProvider();
-        var storage = serviceProvider.GetRequiredService<Storage>();
+        _serviceProvider = services.BuildServiceProvider();
 
-        // Initialize bot
-        _bot = new QuotaBot(storage);
+        // Initialize bot with the service provider
+        _bot = new QuotaBot(_serviceProvider);
         _token = token;
     }
 
