@@ -5,6 +5,13 @@ export interface Session {
   userAvatar: string;
 }
 
+export interface Guild {
+  id: string;
+  name: string;
+  icon: string;
+  bot: boolean;
+}
+
 export interface TextEmoji {
   id: string;
   name: string;

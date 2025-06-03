@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { Settings, type Icon, ChartNoAxesColumn, LayoutGrid } from 'lucide-svelte';
 	import SidebarItem from './SidebarItem.svelte';
+	import { page } from '$app/state';
+	import type { Guild } from '$lib/server/types';
 
 	interface Page {
 		name: string;
@@ -8,10 +10,12 @@
 		path: string;
 	}
 
+	let guild: Guild = $derived(page.data.guild);
+
 	const pages: Page[] = [
-		{ name: 'Overview', icon: LayoutGrid, path: '/dashboard/overview' },
-		{ name: 'Settings', icon: Settings, path: '/dashboard/settings' },
-		{ name: 'Stats', icon: ChartNoAxesColumn, path: '/dashboard/stats' }
+		{ name: 'Overview', icon: LayoutGrid, path: `/dashboard/${guild.id}/overview` },
+		{ name: 'Settings', icon: Settings, path: `/dashboard/${guild.id}/settings` },
+		{ name: 'Stats', icon: ChartNoAxesColumn, path: `/dashboard/${guild.id}/stats` }
 	];
 </script>
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Plus } from 'lucide-svelte';
-	import Button from '../ui/Button.svelte';
+	import ButtonPrimary from '../ui/ButtonPrimary.svelte';
 	import ChannelItem from './ChannelItem.svelte';
 	import SettingsItem from './SettingsItem.svelte';
 	import Switch from '../ui/Switch.svelte';
@@ -35,12 +35,12 @@
 
 		<SettingsItemSection heading={'Channels'}>
 			<div class="flex flex-col gap-4">
-				<Button onclick={() => console.log('Add channel')}>
-					<div class="text-light flex w-full items-center">
+				<ButtonPrimary onclick={() => console.log('Add channel')}>
+					<div class="text-light flex w-full items-center px-4 py-2">
 						<Plus />
 						<div class="flex-1 text-center font-semibold">Add channel</div>
 					</div>
-				</Button>
+				</ButtonPrimary>
 
 				<div class="flex flex-col gap-2">
 					{#if channels.length > 0}

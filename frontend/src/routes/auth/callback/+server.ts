@@ -4,6 +4,20 @@ import { createSession } from "$lib/server/auth";
 import { redirect, type RequestHandler } from "@sveltejs/kit";
 
 export const GET: RequestHandler = async ({ url, fetch, cookies }) => {
+  const guildID = url.searchParams.get('guild_id');
+
+  // If we have a guild ID, this is a bot invite callback
+  if (guildID) {
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: `/dashboard/${guildID}`
+      }
+    });
+  }
+
+  // Otherwise it is an user authorization callback
+
   const urlState: string | null = url.searchParams.get("state");
   const storedState: string | undefined = cookies.get('state');
 

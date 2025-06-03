@@ -1,5 +1,5 @@
 <script lang="ts">
-	import UserAvatar from '$lib/components/ui/UserAvatar.svelte';
+	import Avatar from '$lib/components/ui/Avatar.svelte';
 	import { slide } from 'svelte/transition';
 	import UserMenuItem from './UserMenuItem.svelte';
 	import { Server } from 'lucide-svelte';
@@ -9,6 +9,7 @@
 	import { afterNavigate } from '$app/navigation';
 	import { createFloatingActions } from 'svelte-floating-ui';
 	import { offset } from 'svelte-floating-ui/dom';
+	import ButtonDark from '../ui/ButtonDark.svelte';
 
 	let { user } = $props<{ user: { name: string; picture: string } }>();
 
@@ -39,7 +40,7 @@
 			? 'bg-highlight'
 			: 'hover:bg-highlight'} transition-colors duration-300"
 	>
-		<UserAvatar {user} />
+		<Avatar image={user.picture} text={user.name} />
 
 		{#if open}
 			<div
@@ -58,7 +59,6 @@
 			transition:slide={{ duration: 500, axis: 'y' }}
 		>
 			<UserMenuItem icon={LayoutGrid} text={'Dashboard'} href="/dashboard" />
-			<UserMenuItem icon={Server} text={'Servers'} href="/" />
 			<UserMenuItem icon={Settings} text={'Settings'} href="/" />
 			<UserMenuItem icon={LogOut} text={'Logout'} href="/" />
 		</div>

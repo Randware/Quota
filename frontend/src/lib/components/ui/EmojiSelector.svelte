@@ -30,6 +30,7 @@
 	<div class="fixed inset-0 z-40 h-screen w-screen" onclick={() => (showSelector = false)}></div>
 {/if}
 
+<!--  TODO: Use ButtonDark component here -->
 <button
 	use:referenceAction
 	class="bg-dark border-highlight hover:bg-highlight flex aspect-square w-12 items-center justify-center rounded-xl border-2 p-2 transition-colors duration-300 {showSelector

@@ -1,11 +1,11 @@
 <script lang="ts">
-	import Button from '$lib/components/ui/Button.svelte';
+	import ButtonPrimary from '$lib/components/ui/ButtonPrimary.svelte';
 
 	function runAuthFlow() {
 		window.location.href = '/auth/login';
 	}
 </script>
 
-<Button onclick={runAuthFlow}>
-	<div class="text-light text-md font-bold sm:text-lg">Log in with Discord</div>
-</Button>
+<ButtonPrimary onclick={runAuthFlow}>
+	<div class="text-light text-md px-4 py-2 font-bold sm:text-lg">Log in with Discord</div>
+</ButtonPrimary>
