@@ -2,14 +2,12 @@
 	import Avatar from '$lib/components/ui/Avatar.svelte';
 	import { slide } from 'svelte/transition';
 	import UserMenuItem from './UserMenuItem.svelte';
-	import { Server } from 'lucide-svelte';
 	import LayoutGrid from 'lucide-svelte/icons/layout-grid';
 	import LogOut from 'lucide-svelte/icons/log-out';
 	import Settings from 'lucide-svelte/icons/settings';
 	import { afterNavigate } from '$app/navigation';
 	import { createFloatingActions } from 'svelte-floating-ui';
 	import { offset } from 'svelte-floating-ui/dom';
-	import ButtonDark from '../ui/ButtonDark.svelte';
 
 	let { user } = $props<{ user: { name: string; picture: string } }>();
 

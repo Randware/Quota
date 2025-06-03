@@ -23,7 +23,7 @@ async function fetchStatsFromBackend(guild: Guild): Promise<Stats> {
 export async function getGuildStats(guild: Guild): Promise<Stats> {
   const cacheKey = `guild-stats:${guild.id}`;
 
-  return await cache.wrap(cacheKey, async () => {
+  return cache.wrap(cacheKey, async () => {
     const stats = await fetchStatsFromBackend(guild);
     return stats;
   }, { ttl: CACHE_TTL });
