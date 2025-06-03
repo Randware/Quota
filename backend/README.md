@@ -41,7 +41,34 @@ enabled = true                  # Enable/disable Swagger UI
 
 [server]
 port = 5000                     # Server port (default: 5000)
+
+[bot]
+token = "your_bot_token"        # Discord bot token from Developer Portal
 ```
+
+### Bot Configuration
+
+The Discord bot requires a token to function. To get your bot token:
+
+1. Go to https://discord.com/developers/applications
+2. Select your application
+3. Navigate to the "Bot" section
+4. Click "Reset Token" or copy your existing token
+5. Paste it in your config.toml under the [bot] section
+
+⚠️ **Important**: Keep your bot token secret! Never commit it to version control.
+
+Required Bot Permissions:
+- View Channels
+- Send Messages
+- Send Messages in Threads
+- Embed Links
+- Use External Emojis
+- Add Reactions
+- View Guild Insights
+- Manage Guild
+
+You can use the `/bot/invite` endpoint to get an invite link with all required permissions pre-configured.
 
 ## 📖 API Documentation
 
@@ -61,6 +88,7 @@ The Swagger UI provides:
 - All sensitive data should be properly configured, especially:
   - JWT secret (used for signing tokens)
   - Discord OAuth credentials
+  - Bot token
 - Never share your actual `config.toml` with others 
 
 ## 🛠️ Development
@@ -68,6 +96,7 @@ The Swagger UI provides:
 ### Prerequisites
 - .NET 9.0 or higher
 - A Discord application (for OAuth)
+- A Discord bot token
 
 ### Local Development
 1. Clone the repository

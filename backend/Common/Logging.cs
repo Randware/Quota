@@ -1,6 +1,8 @@
 using System.IO.Compression;
 using Serilog;
+using Serilog.Core;
 using Serilog.Exceptions;
+using Serilog.Events;
 
 namespace Common;
 
@@ -9,7 +11,7 @@ namespace Common;
 /// </summary>
 public static class Log
 {
-    // Serilog instace
+    // Serilog instance
     private static volatile ILogger? _logger;
 
     // Lock for the initialization
@@ -58,20 +60,30 @@ public static class Log
     /// </summary>
     public static bool IsDevelopment => Environment.Equals("Development", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Global logger instance. Creates the logger if it doesn't exist.
+    /// </summary>
+    public static ILogger Logger
+    {
+        get
+        {
+            if (_logger == null)
+            {
+                SetupLogging(Directory.GetCurrentDirectory());
+            }
+            return _logger!;
+        }
+    }
 
     public static void SetupLogging(string logsDirectory)
     {
-
         if (_logger != null)
             return;
 
         lock (_syncRoot)
         {
-
-
             if (_logger != null)
-                return; //Double-check to avoid race condition
-
+                return;
 
             if (string.IsNullOrWhiteSpace(logsDirectory))
                 logsDirectory = Directory.GetCurrentDirectory();
@@ -82,8 +94,6 @@ public static class Log
 
             if (File.Exists(latest))
             {
-
-
                 var lastModUtc = File.GetLastWriteTimeUtc(latest);
                 string date = lastModUtc.ToString("yyyy-MM-dd");
 
@@ -112,32 +122,31 @@ public static class Log
             }
 
             var loggerConfig = new LoggerConfiguration()
-            .Enrich.WithExceptionDetails()
-            .MinimumLevel.Is(Log.IsDebugMode
-                            ? Serilog.Events.LogEventLevel.Debug
-                            : Serilog.Events.LogEventLevel.Information)
-            .WriteTo.Console()
-            .WriteTo.File(latest);
+                .MinimumLevel.Is(Log.IsDebugMode
+                    ? LogEventLevel.Debug
+                    : LogEventLevel.Information)
+                // Configure Microsoft logging levels - keeping important info but reducing noise
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+                .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Information)
+                .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Information)
+                // Add enrichers
+                .Enrich.FromLogContext()
+                .Enrich.WithExceptionDetails()
+                // Configure output
+                .WriteTo.Console(outputTemplate: 
+                    "[{Timestamp:HH:mm:ss} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}")
+                .WriteTo.File(latest,
+                    rollingInterval: RollingInterval.Day,
+                    outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
 
             _logger = loggerConfig.CreateLogger();
             Serilog.Log.Logger = _logger;
-        }
-    }
 
-    /// <summary>
-    /// The Global Logger.
-    ///
-    /// Writes the log file in the current directory if the SetupLogging methode was not called
-    /// </summary>
-    public static ILogger Logger
-    {
-        get
-        {
-            if (_logger == null)
+            // Log startup
+            using (Serilog.Context.LogContext.PushProperty("SourceContext", "Logging"))
             {
-                SetupLogging(Directory.GetCurrentDirectory());
+                _logger.Information("Logging initialized with directory: {Directory}", logsDirectory);
             }
-            return _logger!;
         }
     }
 
@@ -145,7 +154,37 @@ public static class Log
     {
         AppDomain.CurrentDomain.ProcessExit += (_, __) =>
         {
-            if (IsInitialized) Serilog.Log.CloseAndFlush();
+            if (IsInitialized)
+            {
+                using (Serilog.Context.LogContext.PushProperty("SourceContext", "Logging"))
+                {
+                    _logger?.Information("Application shutting down, flushing logs...");
+                }
+                Serilog.Log.CloseAndFlush();
+            }
         };
+    }
+}
+
+public class LoggerEnricher : ILogEventEnricher
+{
+    public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
+    {
+        if (!logEvent.Properties.ContainsKey("SourceContext"))
+        {
+            var sourceContext = "System";
+            if (logEvent.Properties.ContainsKey("EventId"))
+            {
+                var eventId = logEvent.Properties["EventId"].ToString();
+                if (eventId.Contains("Microsoft.Hosting.Lifetime"))
+                    sourceContext = "API.Hosting";
+                else if (eventId.Contains("Microsoft.EntityFrameworkCore"))
+                    sourceContext = "Database.EF";
+                else if (eventId.Contains("Microsoft"))
+                    sourceContext = "API.Framework";
+            }
+            logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty(
+                "SourceContext", sourceContext));
+        }
     }
 }
