@@ -1,0 +1,9 @@
+[jwt]
+secret = "your_jwt_secret_here"
+issuer = "your_issuer"
+audience = "your_audience"
+expiryMinutes = 5
+
+[oauth]
+id = "your_discord_client_id"
+secret = "your_discord_client_secret"

@@ -1,4 +1,4 @@
-namespace Global;
+namespace Common;
 
 public static class Util
 {
