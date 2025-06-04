@@ -9,6 +9,4 @@ public class Guild
     public GuildConfig Config { get; set; }
 
     public ICollection<Quote> Quotes { get; set; }
-    public ICollection<AllowedChannel> AllowedChannels { get; set; }
-    public ICollection<Permission> Permissions { get; set; }
 }

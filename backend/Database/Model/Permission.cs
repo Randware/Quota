@@ -2,18 +2,20 @@ namespace Database.Model;
 
 public enum PermissionType
 {
-    SETTINGS,
-    CREATE,
-    DELETE,
-    GET
+    DASHBOARD,
+    ADMIN,
+    MANAGE_QUOTES,
+    CREATE_QUOTES,
+    READ_QUOTES,
 }
 
 public class Permission
 {
+    public int ID { get; set; } // Surrogate primary key
     public Guid GuildConfigID { get; set; }
     public GuildConfig GuildConfig { get; set; }
 
-    public string Role { get; set; }
+    public string? UserID { get; set; } // Discord user ID (nullable)
+    public string? RoleID { get; set; } // Discord role ID (nullable)
     public PermissionType PermissionType { get; set; }
 }
-

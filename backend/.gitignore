@@ -3,6 +3,9 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
+# config toml
+config.toml
+
 # dotenv files
 .env
 
@@ -106,6 +109,11 @@ StyleCopReport.xml
 
 # Chutzpah Test files
 _Chutzpah*
+
+# Databases
+*.db
+*.db-shm
+*.db-wal
 
 # Visual C++ cache files
 ipch/
