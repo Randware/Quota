@@ -1,7 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Common;
+using Microsoft.EntityFrameworkCore;
 using Database.Model;
 using Common.OAuth;
-using Serilog;
 using Serilog.Context;
 using User = Database.Model.User;
 
