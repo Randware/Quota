@@ -66,25 +66,15 @@ namespace API.Controllers
         }
 
         /// <summary>
-<<<<<<< Updated upstream
         /// Gets all guilds the user is in, using the Discord API.
-=======
-        /// Gets all servers (guilds) the user is in, using the Discord API.
->>>>>>> Stashed changes
         /// </summary>
         /// <param name="id">The Discord user ID</param>
         /// <returns>An array of Discord guild objects</returns>
         /// <response code="200">Returns the list of servers</response>
         /// <response code="401">If the JWT is missing or invalid, or user id does not match</response>
-<<<<<<< Updated upstream
         [HttpGet("guilds")]
         [Authorize]
         public async Task<IActionResult> GetGuilds([FromRoute] string id)
-=======
-        [HttpGet("servers")]
-        [Authorize]
-        public async Task<IActionResult> GetServers([FromRoute] string id)
->>>>>>> Stashed changes
         {
             // Use ClaimsPrincipal from ASP.NET Core
             var jwtUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
