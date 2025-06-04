@@ -20,7 +20,7 @@ const MOCK_GUILDS: Guild[] = [
 const MOCK_PERMISSIONS: number = 8;
 
 // Authorizes a new user and returns a session token
-export async function createSession(session: { discordID: string, accessToken: string, refreshToken: string, expiresIn: number }): Promise<string> {
+export async function createSession(code: string, redirectURI: string): Promise<string> {
   if (dev) {
     return MOCK_TOKEN;
   }

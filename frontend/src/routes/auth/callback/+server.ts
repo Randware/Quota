@@ -34,6 +34,7 @@ export const GET: RequestHandler = async ({ url, fetch, cookies }) => {
 
   cookies.delete('state', { path: '/' });
 
+  //  TODO: Replace logic from here
   const data = new URLSearchParams({
     client_id: DISCORD_CLIENT_ID,
     client_secret: DISCORD_CLIENT_SECRET,

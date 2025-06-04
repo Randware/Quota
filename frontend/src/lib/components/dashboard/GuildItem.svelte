@@ -15,6 +15,7 @@
 		{#if displayBackground}
 			<img
 				src={guild.icon}
+				loading="lazy"
 				alt=""
 				class="absolute inset-0 h-full w-full object-cover blur-md brightness-75"
 				onerror={() => (displayBackground = false)}

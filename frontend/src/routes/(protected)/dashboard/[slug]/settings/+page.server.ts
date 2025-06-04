@@ -5,6 +5,9 @@ import type { PageServerLoad, Actions } from './$types';
 export const load: PageServerLoad = async ({ parent }) => {
   const { guild }: { guild: Guild } = await parent();
   const settings: Promise<Settings> = getGuildSettings(guild);
+
+  //  TODO: Load all channels here somehow
+
   return { settings };
 };
 
