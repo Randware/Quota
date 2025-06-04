@@ -85,6 +85,22 @@ class Program
 
         AnsiConsole.WriteLine();
 
+        // Bot Section
+        var botPanel = new Panel("[bold white]🤖 Discord Bot Configuration[/]")
+            .BorderStyle(new Style(Color.Magenta1))
+            .RoundedBorder();
+        AnsiConsole.Write(botPanel);
+        
+        string botToken = AnsiConsole.Prompt(
+            new TextPrompt<string>("[cyan]🎭 Discord bot token:[/]")
+                .Secret()
+                .Validate(value => !string.IsNullOrWhiteSpace(value) 
+                    ? ValidationResult.Success() 
+                    : ValidationResult.Error("[red]Discord bot token is required[/]"))
+        );
+
+        AnsiConsole.WriteLine();
+
         // OpenAPI Section
         var openApiPanel = new Panel("[bold white]📚 OpenAPI/Swagger Configuration[/]")
             .BorderStyle(new Style(Color.Green))
@@ -107,7 +123,7 @@ class Program
         );
 
         // Generate config
-        var configText = GenerateConfigText(secret, issuer, audience, expiryMinutes, oauthId, oauthSecret, apiEndpoint, openApiEnabled, port);
+        var configText = GenerateConfigText(secret, issuer, audience, expiryMinutes, oauthId, oauthSecret, apiEndpoint, botToken, openApiEnabled, port);
 
         AnsiConsole.WriteLine();
         AnsiConsole.Write(new Rule("[bold green]✨ Generated Configuration ✨[/]").RuleStyle("green"));
@@ -138,7 +154,7 @@ class Program
     }
 
     static string GenerateConfigText(string secret, string issuer, string audience, int expiryMinutes, 
-                                   string oauthId, string oauthSecret, string apiEndpoint, bool openApiEnabled, int port)
+                                   string oauthId, string oauthSecret, string apiEndpoint, string botToken, bool openApiEnabled, int port)
     {
         return $@"[jwt]
 secret = ""{secret}""
@@ -150,6 +166,9 @@ expiryMinutes = {expiryMinutes}
 id = ""{oauthId}""
 secret = ""{oauthSecret}""
 apiEndpoint = ""{apiEndpoint}""
+
+[bot]
+token = ""{botToken}""
 
 [openapi]
 enabled = {openApiEnabled.ToString().ToLower()}
