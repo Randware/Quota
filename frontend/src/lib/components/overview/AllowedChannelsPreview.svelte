@@ -22,7 +22,7 @@
 			<SkeletonSquare width={110} height={40} />
 		{:then settings}
 			{#each settings.allowedChannels as channel}
-				<div class="bg-darker text-light text-md rounded-xl p-2 font-medium">{channel}</div>
+				<div class="bg-darker text-light text-md rounded-xl p-2 font-medium">#{channel.name}</div>
 			{/each}
 		{/await}
 	</div>

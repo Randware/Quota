@@ -1,5 +1,5 @@
 export interface Settings {
-  allowedChannels: string[];
+  allowedChannels: Channel[];
   lockAllowedChannels: boolean;
   upvoteEmoji: string;
   downvoteEmoji: string;

@@ -4,23 +4,14 @@
 	import ChannelItem from './ChannelItem.svelte';
 	import SettingsItem from './SettingsItem.svelte';
 	import Switch from '../ui/Switch.svelte';
-	import { type Channel } from '$lib/server/types';
 	import SettingsItemSection from './SettingsItemSection.svelte';
+	import type { Channel, Settings } from '$lib/server/types';
 
-	let channels: Channel[] = [
-		{
-			id: '1',
-			name: '📜-quotes'
-		},
-		{
-			id: '2',
-			name: '💬-general'
-		}
-	];
+	let { settings = $bindable() } = $props<{ settings: Settings }>();
 
-	function removeChannel(id: string) {
+	async function removeChannel(id: string) {
 		//  TODO: Query backend here
-		channels = channels.filter((c) => c.id !== id);
+		settings.allowedChannels = settings.allowedChannels.filter((c: Channel) => c.id !== id);
 	}
 </script>
 
@@ -29,7 +20,8 @@
 		<SettingsItemSection heading={'Channel settings'}>
 			<div class="flex items-center gap-4">
 				<div class="text-light flex-1 font-semibold">Lock channels</div>
-				<Switch />
+
+				<Switch bind:toggled={settings.lockAllowedChannels} />
 			</div>
 		</SettingsItemSection>
 
@@ -43,8 +35,8 @@
 				</ButtonPrimary>
 
 				<div class="flex flex-col gap-2">
-					{#if channels.length > 0}
-						{#each channels as channel}
+					{#if settings.allowedChannels.length > 0}
+						{#each settings.allowedChannels as channel}
 							<ChannelItem id={channel.id} name={channel.name} remove={removeChannel} />
 						{/each}
 					{:else}
