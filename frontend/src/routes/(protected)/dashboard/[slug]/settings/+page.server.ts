@@ -39,6 +39,6 @@ export const actions: Actions = {
 
     await updateGuildSettings(guild, newSettings);
 
-    return { success: false, error: "Failed loading data from backend" };
+    return { success: true };
   }
 };

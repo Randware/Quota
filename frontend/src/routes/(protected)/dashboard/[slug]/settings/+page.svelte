@@ -68,12 +68,6 @@
 				<ChannelsSettings bind:settings={workingSettings} />
 				<VotingSettings bind:settings={workingSettings} />
 				<CommentsSettings bind:settings={workingSettings} />
-
-				{#if isModified}
-					<div class="sticky bottom-8 mx-8" transition:fly={{ y: 10 }}>
-						<ApplyPanel {handleApply} {handleRevert} />
-					</div>
-				{/if}
 			{/if}
 		{:catch error: Error}
 			<div class="flex flex-col items-center gap-4">
@@ -84,4 +78,10 @@
 			</div>
 		{/await}
 	</div>
+
+	{#if isModified}
+		<div class="sticky bottom-8 mx-8" transition:fly={{ y: 10 }}>
+			<ApplyPanel {handleApply} {handleRevert} />
+		</div>
+	{/if}
 </div>
