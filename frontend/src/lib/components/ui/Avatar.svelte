@@ -16,6 +16,7 @@
 
 		<img
 			src={image}
+			loading="lazy"
 			alt={text.charAt(0)}
 			onload={() => (loading = false)}
 			onerror={() => (loading = false)}

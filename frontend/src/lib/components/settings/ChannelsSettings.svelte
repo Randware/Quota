@@ -1,18 +1,34 @@
 <script lang="ts">
-	import { Plus } from 'lucide-svelte';
-	import ButtonPrimary from '../ui/ButtonPrimary.svelte';
-	import ChannelItem from './ChannelItem.svelte';
 	import SettingsItem from './SettingsItem.svelte';
 	import Switch from '../ui/Switch.svelte';
 	import SettingsItemSection from './SettingsItemSection.svelte';
 	import type { Channel, Settings } from '$lib/server/types';
+	import DeleteChannelMenu from './DeleteChannelMenu.svelte';
+	import AddChannelMenu from './AddChannelMenu.svelte';
+	import { fly } from 'svelte/transition';
 
-	let { settings = $bindable() } = $props<{ settings: Settings }>();
+	let allChannels: Channel[] = [
+		{ id: 'testid', name: 'john-channel' },
+		{ id: '123123412451224', name: 'am-a-channel' }
+	];
 
-	async function removeChannel(id: string) {
-		//  TODO: Query backend here
-		settings.allowedChannels = settings.allowedChannels.filter((c: Channel) => c.id !== id);
+	let addChannels: Channel[] = $derived(
+		allChannels.filter(
+			(c: Channel) => !settings.allowedChannels.find((a: Channel) => a.id === c.id)
+		)
+	);
+
+	let { settings = $bindable() }: { settings: Settings } = $props<{ settings: Settings }>();
+
+	function removeChannel(channel: Channel) {
+		settings.allowedChannels = settings.allowedChannels.filter((c: Channel) => c.id !== channel.id);
 	}
+
+	function addChannel(channel: Channel) {
+		settings.allowedChannels = [...settings.allowedChannels, channel];
+	}
+
+	let displayRemove: boolean = $state(true);
 </script>
 
 <SettingsItem heading={'Channels'}>
@@ -26,28 +42,23 @@
 		</SettingsItemSection>
 
 		<SettingsItemSection heading={'Channels'}>
-			<div class="flex flex-col gap-4">
-				<ButtonPrimary onclick={() => console.log('Add channel')}>
-					<div class="text-light flex w-full items-center px-4 py-2">
-						<Plus />
-						<div class="flex-1 text-center font-semibold">Add channel</div>
-					</div>
-				</ButtonPrimary>
-
-				<div class="flex flex-col gap-2">
-					{#if settings.allowedChannels.length > 0}
-						{#each settings.allowedChannels as channel}
-							<ChannelItem id={channel.id} name={channel.name} remove={removeChannel} />
-						{/each}
-					{:else}
-						<div
-							class="border-highlight text-light rounded-xl border-2 border-dashed p-4 text-center font-semibold"
-						>
-							No channels
-						</div>
-					{/if}
+			{#if displayRemove}
+				<div class="" in:fly={{ x: -10, duration: 500 }}>
+					<DeleteChannelMenu
+						bind:channels={settings.allowedChannels}
+						{removeChannel}
+						switchView={() => (displayRemove = false)}
+					/>
 				</div>
-			</div>
+			{:else}
+				<div class="" in:fly={{ x: 10, duration: 500 }}>
+					<AddChannelMenu
+						bind:channels={addChannels}
+						{addChannel}
+						switchView={() => (displayRemove = true)}
+					/>
+				</div>
+			{/if}
 		</SettingsItemSection>
 	</div>
 </SettingsItem>

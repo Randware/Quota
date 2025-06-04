@@ -80,7 +80,7 @@
 	</div>
 
 	{#if isModified}
-		<div class="sticky bottom-8 mx-8" transition:fly={{ y: 10 }}>
+		<div class="sticky bottom-8 mx-8" transition:fly={{ y: 10, duration: 300 }}>
 			<ApplyPanel {handleApply} {handleRevert} />
 		</div>
 	{/if}
