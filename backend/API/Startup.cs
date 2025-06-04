@@ -10,6 +10,7 @@ using Tomlyn;
 using Tomlyn.Model;
 using Serilog.Context;
 using Microsoft.Extensions.Logging;
+using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Events;
 
@@ -114,26 +115,73 @@ public class Startup
                     oauthConfig.Secret,
                     oauthConfig.ApiEndpoint
                 ));
+                // Add JWT Bearer authentication
+                services.AddAuthentication(options =>
+                {
+                    options.DefaultAuthenticateScheme = "Bearer";
+                    options.DefaultChallengeScheme = "Bearer";
+                })
+                .AddJwtBearer("Bearer", options =>
+                {
+                    options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        ValidIssuer = jwtConfig.Issuer,
+                        ValidAudience = jwtConfig.Audience,
+                        IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(jwtConfig.Secret)),
+                        ClockSkew = System.TimeSpan.FromSeconds(30)
+                    };
+                });
                 // Add Swagger/OpenAPI if enabled
                 if (_openApiEnabled)
                 {
                     services.AddEndpointsApiExplorer();
                     services.AddSwaggerGen(options =>
                     {
-                        options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+                        options.SwaggerDoc("v1", new OpenApiInfo
                         {
                             Title = "Randware Quota API",
                             Version = "v1",
-                            Description = "Beautiful, interactive documentation for the Randware Quota API. All endpoints are documented with request/response examples and descriptions."
+                            Description = "Beautiful, interactive documentation for the Randware Quota API."
                         });
-                        // Enable XML comments if present
-                        var xmlFile = $"API.xml";
-                        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-                        if (File.Exists(xmlPath))
+
+                        // Add JWT Bearer
+                        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
                         {
-                            options.IncludeXmlComments(xmlPath);
-                        }
-                    });
+                            Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
+                            Name = "Authorization",
+                            In = ParameterLocation.Header,
+                            Type = SecuritySchemeType.Http,
+                            Scheme = "bearer",
+                            BearerFormat = "JWT"
+                        });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
+
+    // XML comments if present
+    var xmlFile = $"API.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath);
+    }
+});
                 }
 
                 Log.Logger.Information("API services configured successfully");
@@ -181,7 +229,7 @@ public class Startup
                         }
                     };
                     opts.MessageTemplate = "[{RequestMethod}] {RequestPath} responded {StatusCode} in {Elapsed:0.0000}ms";
-                    opts.GetLevel = (httpContext, elapsed, ex) => 
+                    opts.GetLevel = (httpContext, elapsed, ex) =>
                     {
                         if (ex != null) return LogEventLevel.Error;
                         if (httpContext.Response.StatusCode > 499) return LogEventLevel.Error;
@@ -202,6 +250,7 @@ public class Startup
                 }
 
                 app.UseRouting();
+                app.UseAuthentication(); 
                 app.UseAuthorization();
                 app.UseEndpoints(endpoints =>
                 {
@@ -221,3 +270,4 @@ public class Startup
         }
     }
 }
+

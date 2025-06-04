@@ -58,6 +58,38 @@ public static class API
             throw;
         }
     }
+    
+    
+    /// <summary>
+    /// Fetches the all guilds of the user from the Discord API using the provided token.
+    /// </summary>
+    /// <param name="token">An access token containing the token type and access token string.</param>
+    /// <returns>
+    /// The  HTTP response of the fetch request, or <c>null</c> if the request fails or is rate-limited.
+    /// </returns>
+    /// <exception cref="HttpRequestException">
+    /// Thrown when the HTTP request fails due to network issues or an invalid response from the server.
+    /// </exception>
+    public static async Task<HttpResponseMessage?> FetchUserGuilds(Token token)
+    {
+        var response = await Fetch(endpoint: "https://discord.com/api/users/@me/guilds", transformers: httpClient =>
+        {
+            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(token.TokenType, token.AccessToken);
+        });
+
+        if (response is null)
+        {
+            Log.Logger.Debug("The provided token is wrong");
+            // This assumes that every fetch error unrelated to HttpRequestException 
+            // is due to a wrongly provided code.
+            return null;
+        }
+        else
+        {
+            return response;
+        }
+
+    }
 
     /// <summary>
     /// Fetches the Access and Refresh Token from the Discord API. 

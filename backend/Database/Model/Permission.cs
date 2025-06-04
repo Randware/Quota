@@ -6,7 +6,7 @@ public enum PermissionType
     ADMIN,
     MANAGE_QUOTES,
     CREATE_QUOTES,
-    VIEW_QUOTES,
+    READ_QUOTES,
 }
 
 public class Permission
