@@ -1,5 +1,5 @@
 <script lang="ts">
-	let toggled = $state(false);
+	let { toggled = $bindable() } = $props<{ toggled: boolean }>();
 </script>
 
 <button
