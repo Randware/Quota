@@ -145,7 +145,7 @@ public class Startup
                         {
                             Title = "Randware Quota API",
                             Version = "v1",
-                            Description = "Beautiful, interactive documentation for the Randware Quota API."
+                            Description = "Interactive documentation for the Randware Quota API. All endpoints are documented with request/response examples and descriptions."
                         });
 
                         // Add JWT Bearer
@@ -270,4 +270,3 @@ public class Startup
         }
     }
 }
-
