@@ -72,9 +72,9 @@ namespace API.Controllers
         /// <returns>An array of Discord guild objects</returns>
         /// <response code="200">Returns the list of servers</response>
         /// <response code="401">If the JWT is missing or invalid, or user id does not match</response>
-        [HttpGet("guilds")]
+        [HttpGet("servers")]
         [Authorize]
-        public async Task<IActionResult> GetGuilds([FromRoute] string id)
+        public async Task<IActionResult> GetServers([FromRoute] string id)
         {
             // Use ClaimsPrincipal from ASP.NET Core
             var jwtUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
