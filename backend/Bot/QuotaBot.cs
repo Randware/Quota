@@ -7,6 +7,7 @@ using Database;
 using Database.Model;
 using Serilog.Context;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 
 namespace Bot;
 
@@ -285,12 +286,12 @@ public class QuotaBot
                             label: $"Upvote ({quote.Upvotes})",
                             customId: $"quote:upvote:{quote.ID}",
                             style: ButtonStyle.Secondary,
-                            emote: new Emoji(guild.Config.UpvoteEmoji))
+                            emote: GetDiscordEmote(guild.Config.UpvoteEmojiConfig))
                         .WithButton(
                             label: $"Downvote ({quote.Downvotes})",
                             customId: $"quote:downvote:{quote.ID}",
                             style: ButtonStyle.Secondary,
-                            emote: new Emoji(guild.Config.DownvoteEmoji));
+                            emote: GetDiscordEmote(guild.Config.DownvoteEmojiConfig));
 
                     await message.ModifyAsync(msg =>
                     {
@@ -303,6 +304,15 @@ public class QuotaBot
         {
             Log.Logger.Warning(ex, "Failed to refresh buttons for message {MessageId}", message.Id);
         }
+    }
+
+    // Helper for Discord emote creation
+    private static IEmote GetDiscordEmote(EmojiConfig emoji)
+    {
+        if (emoji == null) return new Emoji("❓");
+        if (emoji.IsCustom && !string.IsNullOrEmpty(emoji.Id))
+            return Emote.Parse($"<:{emoji.Name}:{emoji.Id}>");
+        return new Emoji(emoji.Name);
     }
 
     private async Task OnJoinedGuild(SocketGuild guild)
@@ -452,31 +462,52 @@ public class QuotaBot
         });
     }
 
-    private async Task SyncGuildPermissions(SocketGuild guild, Storage storage)
+    private async Task SyncGuildPermissions(SocketGuild guild, Storage _)
     {
         try
         {
             Log.Logger.Information("Syncing permissions for guild: {GuildName} ({GuildId})", guild.Name, guild.Id);
-            
-            // Download all users to ensure we have the latest data
             await guild.DownloadUsersAsync();
-            
+
+            // Always create a new scope and resolve Storage/DbContext for thread safety
+            using var scope = _services.CreateScope();
+            var storage = scope.ServiceProvider.GetRequiredService<Storage>();
+
+            // Double-check existence before creating
             var dbGuild = await storage.GetGuildByDiscordIdAsync(guild.Id.ToString());
             if (dbGuild == null)
             {
-                dbGuild = await storage.CreateGuildAsync(new Guild
+                var db = scope.ServiceProvider.GetRequiredService<Database.Model.QuotaContext>();
+                // Check for existing GuildConfig not linked to a Guild
+                var existingConfig = await db.GuildConfigs
+                    .Include(cfg => cfg.Guild)
+                    .FirstOrDefaultAsync(cfg => cfg.Guild == null && db.Guilds.All(g => g.DiscordID != guild.Id.ToString()));
+                if (existingConfig != null)
                 {
-                    DiscordID = guild.Id.ToString(),
-                    Config = new GuildConfig
+                    dbGuild = new Guild
                     {
-                        UpvoteEmoji = "👍",
-                        DownvoteEmoji = "👎",
-                        AllowVoting = true,
-                        LockAllowedChannels = false,
-                        Comments = true
-                    }
-                });
-                Log.Logger.Information("Created new guild config for {GuildName}", guild.Name);
+                        DiscordID = guild.Id.ToString(),
+                        ConfigID = existingConfig.ID,
+                        Config = existingConfig
+                    };
+                    db.Guilds.Add(dbGuild);
+                    await db.SaveChangesAsync();
+                }
+                else
+                {
+                    dbGuild = await storage.CreateGuildAsync(new Guild
+                    {
+                        DiscordID = guild.Id.ToString(),
+                        Config = new GuildConfig
+                        {
+                            UpvoteEmojiConfig = new EmojiConfig { Type = "unicode", Name = "👍" },
+                            DownvoteEmojiConfig = new EmojiConfig { Type = "unicode", Name = "👎" },
+                            AllowVoting = true,
+                            LockAllowedChannels = false,
+                            Comments = true
+                        }
+                    });
+                }
             }
 
             // Remove permissions for users no longer in the guild
@@ -485,20 +516,20 @@ public class QuotaBot
             // Update permissions for all current users in batches to avoid overwhelming the database
             var users = guild.Users.Where(u => !u.IsBot).ToList();
             var batchSize = 10;
-            
             for (int i = 0; i < users.Count; i += batchSize)
             {
                 var batch = users.Skip(i).Take(batchSize);
-                var tasks = batch.Select(user => UpdateUserPermissions(user, storage));
+                var tasks = batch.Select(user => {
+                    using var userScope = _services.CreateScope();
+                    var userStorage = userScope.ServiceProvider.GetRequiredService<Storage>();
+                    return UpdateUserPermissions(user, userStorage);
+                });
                 await Task.WhenAll(tasks);
-                
-                // Small delay between batches
                 if (i + batchSize < users.Count)
                 {
                     await Task.Delay(100);
                 }
             }
-
             Log.Logger.Information("Completed permission sync for guild: {GuildName} ({UserCount} users)", guild.Name, users.Count);
         }
         catch (Exception ex)
@@ -643,6 +674,11 @@ public class QuotaBot
     {
         try
         {
+            if (dbGuild == null || dbGuild.Config == null)
+            {
+                Log.Logger.Warning("dbGuild or dbGuild.Config is null for guild {GuildId}, skipping orphaned permissions cleanup", guild.Id);
+                return;
+            }
             using var scope = _services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<QuotaContext>();
 
@@ -757,4 +793,3 @@ public class QuoteWithGuildInfo
     public int Upvotes { get; set; }
     public int Downvotes { get; set; }
 }
-

@@ -89,6 +89,7 @@ public class QuotaContext : DbContext
         {
             b.HasKey(g => g.ID);
             b.Property(g => g.DiscordID).IsRequired();
+            b.HasIndex(g => g.DiscordID).IsUnique(); // Enforce uniqueness at the DB level
 
             b.HasOne(g => g.Config)
              .WithOne(cfg => cfg.Guild)
@@ -100,8 +101,20 @@ public class QuotaContext : DbContext
         modelBuilder.Entity<GuildConfig>(b =>
         {
             b.HasKey(cfg => cfg.ID);
-            b.Property(cfg => cfg.UpvoteEmoji).IsRequired();
-            b.Property(cfg => cfg.DownvoteEmoji).IsRequired();
+            b.OwnsOne(cfg => cfg.UpvoteEmojiConfig, eb =>
+            {
+                eb.Property(e => e.Type).IsRequired();
+                eb.Property(e => e.Name).IsRequired();
+                eb.Property(e => e.Id).IsRequired(false);
+                eb.Property(e => e.Animated).IsRequired();
+            });
+            b.OwnsOne(cfg => cfg.DownvoteEmojiConfig, eb =>
+            {
+                eb.Property(e => e.Type).IsRequired();
+                eb.Property(e => e.Name).IsRequired();
+                eb.Property(e => e.Id).IsRequired(false);
+                eb.Property(e => e.Animated).IsRequired();
+            });
             b.Property(cfg => cfg.LockAllowedChannels).IsRequired();
             b.Property(cfg => cfg.Comments).IsRequired();
         });

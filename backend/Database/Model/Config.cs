@@ -1,10 +1,27 @@
 namespace Database.Model;
 
+public class EmojiConfig
+{
+    public string Type { get; set; } // "unicode" or "custom"
+    public string? Id { get; set; } // Only for custom
+    public string Name { get; set; } // Name or unicode char
+    public bool Animated { get; set; } = false;
+
+    public bool IsCustom => Type == "custom" && !string.IsNullOrEmpty(Id);
+
+    public string? ToFrontendUrl()
+    {
+        if (!IsCustom) return null;
+        var ext = Animated ? "gif" : "png";
+        return $"https://cdn.discordapp.com/emojis/{Id}.{ext}";
+    }
+}
+
 public class GuildConfig
 {
     public Guid ID { get; set; }
-    public string UpvoteEmoji { get; set; }
-    public string DownvoteEmoji { get; set; }
+    public EmojiConfig UpvoteEmojiConfig { get; set; }
+    public EmojiConfig DownvoteEmojiConfig { get; set; }
     public bool AllowVoting { get; set; }
     public bool LockAllowedChannels { get; set; }
     public bool Comments { get; set; }
