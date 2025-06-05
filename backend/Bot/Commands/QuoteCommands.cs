@@ -3,6 +3,7 @@ using Discord.Interactions;
 using Database;
 using Database.Model;
 using Common;
+using Microsoft.EntityFrameworkCore;
 using Serilog.Context;
 
 namespace Bot;
@@ -28,7 +29,33 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
         // Quick validation first - keep it minimal to avoid timeout
         if (string.IsNullOrWhiteSpace(content) && image == null)
         {
-            await RespondAsync("You must provide either text content or an image for the quote.", ephemeral: true);
+            await QuotaBot.SendBeautifulErrorAsync(Context, "You must provide either text content or an image for the quote.");
+            return;
+        }
+
+        // Get or create guild (needed for config check)
+        var guild = await _storage.GetGuildByDiscordIdAsync(Context.Guild.Id.ToString());
+        if (guild == null)
+        {
+            guild = await _storage.CreateGuildAsync(new Guild
+            {
+                DiscordID = Context.Guild.Id.ToString(),
+                Config = new GuildConfig
+                {
+                    UpvoteEmojiConfig = new EmojiConfig { Type = "unicode", Name = "👍" },
+                    DownvoteEmojiConfig = new EmojiConfig { Type = "unicode", Name = "👎" },
+                    AllowVoting = true,
+                    LockAllowedChannels = false,
+                    Comments = true
+                }
+            });
+        }
+
+        // Check if quotes are allowed in this channel BEFORE DeferAsync
+        if (guild.Config?.LockAllowedChannels == true &&
+            !guild.Config.AllowedChannels.Any(ac => ac.Channel == Context.Channel.Id.ToString()))
+        {
+            await QuotaBot.SendBeautifulErrorAsync(Context, "Quotes are not allowed in this channel.");
             return;
         }
 
@@ -56,29 +83,11 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
         {
             using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
             {
-                // Get or create guild
-                var guild = await _storage.GetGuildByDiscordIdAsync(Context.Guild.Id.ToString());
-                if (guild == null)
-                {
-                    guild = await _storage.CreateGuildAsync(new Guild
-                    {
-                        DiscordID = Context.Guild.Id.ToString(),
-                        Config = new GuildConfig
-                        {
-                            UpvoteEmojiConfig = new EmojiConfig { Type = "unicode", Name = "👍" },
-                            DownvoteEmojiConfig = new EmojiConfig { Type = "unicode", Name = "👎" },
-                            AllowVoting = true,
-                            LockAllowedChannels = false,
-                            Comments = true
-                        }
-                    });
-                }
-
                 // Check if quotes are allowed in this channel
                 if (guild.Config?.LockAllowedChannels == true &&
                     !guild.Config.AllowedChannels.Any(ac => ac.Channel == Context.Channel.Id.ToString()))
                 {
-                    await FollowupAsync("Quotes are not allowed in this channel.", ephemeral: true);
+                    await QuotaBot.SendBeautifulErrorAsync(Context, "Quotes are not allowed in this channel.");
                     return;
                 }
 
@@ -119,7 +128,7 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                         var updatedUser = await _storage.UpdateUserAsync(quotedUser);
                         if (updatedUser == null || updatedUser.QuoteeProfiles == null || !updatedUser.QuoteeProfiles.Any())
                         {
-                            await FollowupAsync("Error creating quote: Could not update user profile.", ephemeral: true);
+                            await QuotaBot.SendBeautifulErrorAsync(Context, "Error creating quote: Could not update user profile.");
                             return;
                         }
                         quoteeProfile = updatedUser.QuoteeProfiles.First();
@@ -227,19 +236,65 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                 }
 
                 // Send the message and get the message ID
-                var message = await FollowupAsync(
+                var sentMessage = await FollowupAsync(
                     embed: embed.Build(),
                     components: components.Build()
                 );
 
                 // Now set the MessageID and save the quote
-                quote.MessageID = message.Id.ToString();
+                quote.MessageID = sentMessage.Id.ToString();
                 quote = await _storage.CreateQuoteAsync(quote);
 
                 // If it's a video, send the link as a plain message so Discord previews it
                 if (isVideo && !string.IsNullOrWhiteSpace(mediaUrl))
                 {
                     await FollowupAsync(mediaUrl, ephemeral: false);
+                }
+
+                // Create a thread for comments if enabled in config
+                if (guild.Config?.Comments == true)
+                {
+                    try
+                    {
+                        // Fetch the message as an IMessage (required by CreateThreadAsync)
+                        var channel = Context.Channel as ITextChannel;
+                        if (channel != null)
+                        {
+                            var quoteMsg = await channel.GetMessageAsync(sentMessage.Id);
+                            if (quoteMsg == null)
+                            {
+                                await QuotaBot.SendBeautifulErrorAsync(Context, "Could not fetch the quote message to create a thread.");
+                            }
+                            else
+                            {
+                                var thread = await channel.CreateThreadAsync(
+                                    name: $"Discussion",
+                                    autoArchiveDuration: ThreadArchiveDuration.OneHour,
+                                    type: ThreadType.PublicThread,
+                                    message: quoteMsg
+                                );
+                                // Attempt to restrict thread access to users with READ_QUOTES or CREATE_QUOTES permissions
+                                // Discord does not support per-user thread permissions, but we can restrict by role if needed
+                                // For now, just send a message in the thread explaining who should use it
+                                var allowedUsers = await _dbContext.Permissions
+                                    .Where(p => p.GuildConfigID == guild.Config.ID &&
+                                        (p.PermissionType == PermissionType.READ_QUOTES || p.PermissionType == PermissionType.CREATE_QUOTES))
+                                    .Select(p => p.UserID)
+                                    .ToListAsync();
+                                await thread.SendMessageAsync(
+                                    $"Only users with quote read/write permissions should use this thread. If you cannot see or post here, contact a server admin.");
+                            }
+                        }
+                        else
+                        {
+                            await QuotaBot.SendBeautifulErrorAsync(Context, "Could not create a thread: Channel is not a text channel.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Logger.Warning(ex, "Failed to create or configure thread for quote {QuoteId}", quote.ID);
+                        await QuotaBot.SendBeautifulErrorAsync(Context, "Failed to create a discussion thread for this quote.");
+                    }
                 }
 
                 Log.Logger.Information("Created quote {QuoteId} in guild {GuildId}", quote.ID, Context.Guild.Id);
@@ -343,7 +398,7 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                 var guild = await _storage.GetGuildByDiscordIdAsync(Context.Guild.Id.ToString());
                 if (guild?.Config == null)
                 {
-                    await RespondAsync("Error: Guild configuration not found.", ephemeral: true);
+                    await QuotaBot.SendBeautifulErrorAsync(Context, "Error: Guild configuration not found.");
                     return;
                 }
 
@@ -393,11 +448,9 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                 if (!channelPerms.ManageMessages)
                 {
                     if (!Context.Interaction.HasResponded)
-                        await RespondAsync(
+                        await QuotaBot.SendBeautifulErrorAsync(Context,
                             $"✅ Vote recorded! This quote now has **{quote.Upvotes}** upvotes and **{quote.Downvotes}** downvotes.\n" +
-                            "⚠️ *I need 'Manage Messages' permission in this channel to update button displays.*", 
-                            ephemeral: true
-                        );
+                            "⚠️ *I need 'Manage Messages' permission in this channel to update button displays.*");
                     
                     using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
                     {
@@ -418,20 +471,16 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
             else
             {
                 if (!Context.Interaction.HasResponded)
-                    await RespondAsync(
-                        $"✅ Vote recorded! This quote now has **{quote.Upvotes}** upvotes and **{quote.Downvotes}** downvotes.", 
-                        ephemeral: true
-                    );
+                    await QuotaBot.SendBeautifulErrorAsync(Context,
+                        $"✅ Vote recorded! This quote now has **{quote.Upvotes}** upvotes and **{quote.Downvotes}** downvotes.");
             }
         }
         catch (Discord.Net.HttpException ex) when (ex.DiscordCode == DiscordErrorCode.MissingPermissions)
         {
             if (!Context.Interaction.HasResponded)
-                await RespondAsync(
+                await QuotaBot.SendBeautifulErrorAsync(Context,
                     $"✅ Vote recorded! This quote now has **{quote.Upvotes}** upvotes and **{quote.Downvotes}** downvotes.\n" +
-                    "⚠️ *I'm missing permissions to update the button display in this channel.*", 
-                    ephemeral: true
-                );
+                    "⚠️ *I'm missing permissions to update the button display in this channel.*");
 
             using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
             {
@@ -442,11 +491,9 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
         catch (Discord.Net.HttpException ex) when (ex.DiscordCode == DiscordErrorCode.UnknownMessage)
         {
             if (!Context.Interaction.HasResponded)
-                await RespondAsync(
+                await QuotaBot.SendBeautifulErrorAsync(Context,
                     $"✅ Vote recorded! This quote now has **{quote.Upvotes}** upvotes and **{quote.Downvotes}** downvotes.\n" +
-                    "ℹ️ *The original quote message no longer exists.*", 
-                    ephemeral: true
-                );
+                    "ℹ️ *The original quote message no longer exists.*");
 
             using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
             {
@@ -465,11 +512,9 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
         catch (Discord.Net.HttpException ex)
         {
             if (!Context.Interaction.HasResponded)
-                await RespondAsync(
+                await QuotaBot.SendBeautifulErrorAsync(Context,
                     $"✅ Vote recorded! This quote now has **{quote.Upvotes}** upvotes and **{quote.Downvotes}** downvotes.\n" +
-                    $"⚠️ *Unable to update display: {ex.Reason ?? "Unknown Discord API error"}*", 
-                    ephemeral: true
-                );
+                    $"⚠️ *Unable to update display: {ex.Reason ?? "Unknown Discord API error"}*");
 
             using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
             {
@@ -538,7 +583,7 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                     Context.Channel.Id, Context.Guild.Id);
             }
 
-            await RespondAsync("❌ Error checking permissions. Please try again.", ephemeral: true);
+            await QuotaBot.SendBeautifulErrorAsync(Context, "❌ Error checking permissions. Please try again.");
             return false;
         }
     }
@@ -547,7 +592,7 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
     {
         try
         {
-            await FollowupAsync($"Sorry, there was an error {action}.", ephemeral: true);
+            await QuotaBot.SendBeautifulErrorAsync(Context, $"Sorry, there was an error {action}.");
         }
         catch (Discord.Net.HttpException httpEx) when (httpEx.DiscordCode == DiscordErrorCode.UnknownInteraction)
         {
@@ -582,11 +627,19 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
     }
 
     // Helper for Discord emote creation
-    private static IEmote GetDiscordEmote(EmojiConfig emoji)
+    private IEmote GetDiscordEmote(EmojiConfig emoji)
     {
         if (emoji == null) return new Emoji("❓");
         if (emoji.IsCustom && !string.IsNullOrEmpty(emoji.Id))
-            return Emote.Parse($"<:{emoji.Name}:{emoji.Id}>");
+        {
+            // Try to find the custom emote in the current guild
+            var guild = Context.Guild;
+            var emote = guild.Emotes.FirstOrDefault(e => e.Id.ToString() == emoji.Id);
+            if (emote != null)
+                return emote;
+            // If not found, fallback to unicode
+            return new Emoji(emoji.Name ?? "❓");
+        }
         return new Emoji(emoji.Name);
     }
 }

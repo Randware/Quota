@@ -19,16 +19,20 @@ public class QuotaBot
     private readonly Storage _storage;
     private bool _isReady = false;
 
+    // Static accessor for the running DiscordSocketClient
+    public static DiscordSocketClient? ClientInstance { get; private set; }
+
     public QuotaBot(IServiceProvider services)
     {
         var config = new DiscordSocketConfig
         {
-            GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildMembers,
+            GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildMembers | GatewayIntents.GuildMessages | GatewayIntents.MessageContent | GatewayIntents.GuildEmojis,
             LogLevel = LogSeverity.Debug,
             MessageCacheSize = 1000 // Cache recent messages for button interactions
         };
 
         _client = new DiscordSocketClient(config);
+        ClientInstance = _client;
         _interactions = new InteractionService(_client);
         _services = services;
         _storage = _services.GetRequiredService<Storage>();
@@ -36,6 +40,9 @@ public class QuotaBot
         // Set up logging
         _client.Log += LogDiscordMessage;
         _interactions.Log += LogDiscordMessage;
+
+        // Add message received handler for locked channels
+        _client.MessageReceived += HandleMessageReceivedAsync;
     }
 
     private Task LogDiscordMessage(LogMessage msg)
@@ -311,7 +318,7 @@ public class QuotaBot
     {
         if (emoji == null) return new Emoji("❓");
         if (emoji.IsCustom && !string.IsNullOrEmpty(emoji.Id))
-            return Emote.Parse($"<:{emoji.Name}:{emoji.Id}>");
+            return Emote.Parse($":{emoji.Name}:{emoji.Id}>");
         return new Emoji(emoji.Name);
     }
 
@@ -781,6 +788,71 @@ public class QuotaBot
     {
         _isReady = false;
         await _client.StopAsync();
+    }
+
+    // Real-time message deletion in locked channels
+    private async Task HandleMessageReceivedAsync(SocketMessage message)
+    {
+        // Only care about user messages in guild text channels
+        if (message is not SocketUserMessage userMessage) return;
+        if (userMessage.Author.IsBot) return; // Allow bot messages
+        if (userMessage.Channel is not SocketTextChannel textChannel) return;
+        var guild = textChannel.Guild;
+        if (guild == null) return;
+
+        // Get config for this guild
+        var dbGuild = await _storage.GetGuildByDiscordIdAsync(guild.Id.ToString());
+        var config = dbGuild?.Config;
+        if (config == null || !config.LockAllowedChannels) return;
+
+        // Check if this channel is in AllowedChannels (if any are set)
+        var allowedChannels = config.AllowedChannels?.Select(ac => ac.Channel).ToList();
+        if (allowedChannels != null && allowedChannels.Count > 0 && !allowedChannels.Contains(textChannel.Id.ToString()))
+            return; // Not a locked channel
+
+        // Allow admins to post
+        var guildUser = guild.GetUser(userMessage.Author.Id);
+        if (guildUser != null && guildUser.GuildPermissions.Administrator)
+            return;
+
+        // Delete the message
+        try
+        {
+            await userMessage.DeleteAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Warning(ex, "Failed to delete message in locked channel {ChannelId}", textChannel.Id);
+        }
+    }
+
+    // Helper to send a beautiful error embed (ephemeral)
+    public static async Task SendBeautifulErrorAsync(IInteractionContext ctx, string errorMsg)
+    {
+        var embed = new EmbedBuilder()
+            .WithTitle(":x: Error")
+            .WithDescription(errorMsg)
+            .WithColor(Color.Red)
+            .WithFooter("If you think this is a bug, contact the server admin.")
+            .Build();
+        await ctx.Interaction.RespondAsync(embed: embed, ephemeral: true);
+    }
+
+    // Static method to fetch all custom emotes for a guild
+    public static List<object> GetCustomEmotesForGuild(ulong guildId)
+    {
+        var client = ClientInstance;
+        if (client == null)
+            return new List<object>();
+        var guild = client.GetGuild(guildId);
+        if (guild == null)
+            return new List<object>();
+        return guild.Emotes.Select(e => new {
+            id = e.Id.ToString(),
+            name = e.Name,
+            animated = e.Animated,
+            url = e.Url
+        } as object).ToList();
     }
 }
 

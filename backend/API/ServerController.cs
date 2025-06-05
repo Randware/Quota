@@ -268,5 +268,35 @@ namespace API.Controllers
             await _db.SaveChangesAsync();
             return Ok();
         }
+
+        /// <summary>
+        /// Gets all custom emotes for a specific Discord server (guild).
+        /// </summary>
+        /// <param name="id">The Discord guild ID</param>
+        /// <returns>List of custom emotes in the specified format</returns>
+        /// <response code="200">Returns the list of custom emotes</response>
+        /// <response code="401">If the JWT is missing, invalid, or the guild is not allowed</response>
+        [HttpGet("emotes")]
+        [Authorize]
+        public IActionResult GetGuildEmotes([FromRoute] string id)
+        {
+            var jwtUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (string.IsNullOrEmpty(jwtUserId))
+                return Unauthorized("Missing user id in token");
+
+            var allowedGuilds = User.FindFirst("allowed_guilds")?.Value;
+            if (allowedGuilds == null || !allowedGuilds.Split(',').Contains(id))
+            {
+                return Unauthorized("You do not have access to this guild.");
+            }
+
+            if (!ulong.TryParse(id, out var guildId))
+                return BadRequest("Invalid guild id");
+
+            // Fetch emotes using the static method in Bot.QuotaBot
+            var emotes = Bot.QuotaBot.GetCustomEmotesForGuild(guildId);
+            return Ok(emotes);
+        }
     }
 }
