@@ -12,10 +12,10 @@ export interface Stats {
 }
 
 export interface Session {
-  auth_token: string;
-  refresh_token: string;
-  userName: string;
-  userAvatar: string;
+  jwt: string;
+  token: string;
+  username: string;
+  avatar: string;
 }
 
 export interface Guild {
