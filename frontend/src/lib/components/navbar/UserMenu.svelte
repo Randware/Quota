@@ -59,7 +59,7 @@
 		>
 			<UserMenuItem icon={LayoutGrid} text={'Dashboard'} href="/dashboard" />
 			<UserMenuItem icon={Settings} text={'Settings'} href="/" />
-			<UserMenuItem icon={LogOut} text={'Logout'} href="/" />
+			<UserMenuItem icon={LogOut} text={'Logout'} href="/auth/logout" />
 		</div>
 	{/if}
 </div>
