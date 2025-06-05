@@ -282,7 +282,7 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                                     .Select(p => p.UserID)
                                     .ToListAsync();
                                 await thread.SendMessageAsync(
-                                    $"Only users with quote read/write permissions should use this thread. If you cannot see or post here, contact a server admin.");
+                                    $"Discussion thread for quote by {quotee}.\n");
                             }
                         }
                         else
