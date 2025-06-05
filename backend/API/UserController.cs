@@ -22,11 +22,13 @@ namespace API.Controllers
     {
         private readonly QuotaContext _db;
         private readonly JwtService _jwtService;
+        private readonly DiscordTokenService _discordTokenService;
 
-        public UserController(QuotaContext db, JwtService jwtService)
+        public UserController(QuotaContext db, JwtService jwtService, DiscordTokenService discordTokenService)
         {
             _db = db;
             _jwtService = jwtService;
+            _discordTokenService = discordTokenService;
         }
 
         /// <summary>
@@ -76,7 +78,6 @@ namespace API.Controllers
         [Authorize]
         public async Task<IActionResult> GetGuilds([FromRoute] string id)
         {
-            // Use ClaimsPrincipal from ASP.NET Core
             var jwtUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                 ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
             if (jwtUserId != id)
@@ -84,23 +85,11 @@ namespace API.Controllers
                 return Unauthorized("User ID does not match token");
             }
 
-            // Get the user's Discord access token from the latest session
-            var discordToken = await _db.Sessions
-                .Include(s => s.Token)
-                .Where(s => s.Token.DiscordID == id && !s.Revoked && s.ExpiresAt > DateTime.UtcNow)
-                .OrderByDescending(s => s.CreatedAt)
-                .Select(s => s.Token)
-                .FirstOrDefaultAsync();
+            var token = await _discordTokenService.GetValidTokenForUserAsync(id, new[] { "guilds", "identify" });
+            if (token == null)
+                return StatusCode(403, "No valid Discord token found for user, or required scopes are missing, or token refresh failed.");
 
-            if (discordToken == null)
-                return Unauthorized("No valid Discord token found for user");
-
-            var response = await Common.OAuth.API.FetchUserGuilds(new Token
-            {
-                AccessToken = discordToken.AccessToken,
-                RefreshToken = discordToken.RefreshToken,
-                TokenType = "Bearer",
-            });
+            var response = await Common.OAuth.API.FetchUserGuilds(token);
             if (response is null)
             {
                 return StatusCode(500, "Failed to fetch servers from Discord API");
@@ -108,6 +97,42 @@ namespace API.Controllers
             if (!response.IsSuccessStatusCode)
             {
                 return StatusCode((int)response.StatusCode, "Failed to fetch servers from Discord API");
+            }
+            var json = await response.Content.ReadAsStringAsync();
+            var doc = JsonDocument.Parse(json);
+            return Ok(doc.RootElement);
+        }
+
+        /// <summary>
+        /// Gets the raw Discord user info for the specified user ID.
+        /// </summary>
+        /// <param name="id">The Discord user ID</param>
+        /// <returns>The raw Discord user info as returned by the Discord API</returns>
+        /// <response code="200">Returns the user's raw Discord info</response>
+        /// <response code="401">If the JWT is missing or invalid, or user id does not match</response>
+        [HttpGet("info")]
+        [Authorize]
+        public async Task<IActionResult> GetUserInfo([FromRoute] string id)
+        {
+            var jwtUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (jwtUserId != id)
+            {
+                return Unauthorized("User ID does not match token");
+            }
+
+            var token = await _discordTokenService.GetValidTokenForUserAsync(id, new[] { "identify" });
+            if (token == null)
+                return StatusCode(403, "No valid Discord token found for user, or required scopes are missing, or token refresh failed.");
+
+            var response = await Common.OAuth.API.FetchUserRaw(token);
+            if (response is null)
+            {
+                return StatusCode(500, "Failed to fetch user info from Discord API");
+            }
+            if (!response.IsSuccessStatusCode)
+            {
+                return StatusCode((int)response.StatusCode, "Failed to fetch user info from Discord API");
             }
             var json = await response.Content.ReadAsStringAsync();
             var doc = JsonDocument.Parse(json);

@@ -16,12 +16,14 @@ public class AuthController : ControllerBase
     private readonly Storage _storage;
     private readonly JwtService _jwtService;
     private readonly OAuth.Client _discordClient;
+    private readonly DiscordTokenService _discordTokenService;
 
-    public AuthController(Storage storage, JwtService jwtService, OAuth.Client discordClient)
+    public AuthController(Storage storage, JwtService jwtService, OAuth.Client discordClient, DiscordTokenService discordTokenService)
     {
         _storage = storage;
         _jwtService = jwtService;
         _discordClient = discordClient;
+        _discordTokenService = discordTokenService;
     }
 
     /// <summary>
@@ -35,24 +37,24 @@ public class AuthController : ControllerBase
         var token = await OAuth.API.GetToken(request.Code, request.RedirectUri, _discordClient);
         if (token == null)
             return BadRequest(new { error = "Invalid code or RedirectURI" });
-        var discordUser = await OAuth.API.FetchUser(token.Value);
+        var discordUser = await OAuth.API.FetchUser(token);
         if (discordUser == null)
             return BadRequest(new { error = "Could not fetch Discord user" });
 
         var dbToken = await _storage.GetDiscordTokenByDiscordIdAsync(discordUser.Value.ID);
         if (dbToken == null)
         {
-            dbToken = await _storage.CreateDiscordTokenAsync(discordUser.Value, token.Value);
+            dbToken = await _storage.CreateDiscordTokenAsync(discordUser.Value, token);
         }
         else
         {
-            dbToken = await _storage.UpdateDiscordTokenAsync(dbToken, token.Value);
+            dbToken = await _storage.UpdateDiscordTokenAsync(dbToken, token);
         }
 
         // Generate a new random refresh token for the app session
         var appRefreshToken = Guid.NewGuid().ToString();
-        var session = await _storage.CreateSessionAsync(dbToken.ID, appRefreshToken, token.Value.ExpiresIn);
-        // Get all guilds where user has SETTINGS permission
+        var session = await _storage.CreateSessionAsync(dbToken.ID, appRefreshToken, token.ExpiresIn);
+        // Get all guilds where user has DASHBOARD or ADMIN permission
         var allowedGuilds = await GetAllowedGuilds(discordUser.Value.ID);
         var jwt = _jwtService.GenerateJwt(discordUser.Value.ID, session.ID, allowedGuilds);
 
@@ -72,22 +74,11 @@ public class AuthController : ControllerBase
             return Unauthorized(new { error = "Session revoked or not found" });
 
         var dbToken = session.Token;
-        // Step 1: Refresh Discord token if needed
-        if (dbToken.ExpiresAt <= DateTime.UtcNow)
-        {
-            var refreshed = await OAuth.API.RefreshToken(new Token
-            {
-                AccessToken = dbToken.AccessToken,
-                RefreshToken = dbToken.RefreshToken,
-                TokenType = "Bearer",
-                ExpiresIn = (long)(dbToken.ExpiresAt - dbToken.CreatedAt).TotalSeconds,
-                CreatedAt = dbToken.CreatedAt,
-                Scope = (dbToken.Scope ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries).ToHashSet()
-            }, _discordClient);
-            if (refreshed == null)
-                return Unauthorized(new { error = "Could not refresh Discord token" });
-            dbToken = await _storage.UpdateDiscordTokenAsync(dbToken, refreshed.Value);
-        }
+        // Step 1: Refresh Discord token if needed (use DiscordTokenService)
+        var token = await _discordTokenService.GetValidTokenForUserAsync(dbToken.DiscordID);
+        if (token == null)
+            return Unauthorized(new { error = "Could not refresh Discord token" });
+        dbToken = await _storage.UpdateDiscordTokenAsync(dbToken, token);
 
         // Step 2: Revoke the old app session
         session.Revoked = true;
@@ -158,7 +149,7 @@ public class AuthController : ControllerBase
         return Ok(new { revoked = count });
     }
 
-    // Helper to get all guilds where user has SETTINGS permission
+    // Helper to get all guilds where user has DASHBOARD or ADMIN permission
     private async Task<IEnumerable<string>> GetAllowedGuilds(string discordId)
     {
         var allowedGuilds = new List<string>();
@@ -168,7 +159,7 @@ public class AuthController : ControllerBase
         foreach (var guild in guilds)
         {
             if (guild.Config?.Permissions != null &&
-                guild.Config.Permissions.Any(p => p.UserID == user.DiscordID && p.PermissionType.ToString() == "SETTINGS"))
+                guild.Config.Permissions.Any(p => p.UserID == user.DiscordID && (p.PermissionType == Database.Model.PermissionType.DASHBOARD || p.PermissionType == Database.Model.PermissionType.ADMIN)))
             {
                 allowedGuilds.Add(guild.DiscordID);
             }

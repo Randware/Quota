@@ -3,10 +3,7 @@ using Serilog.Context;
 namespace Common.OAuth;
 
 using System.Text.Json;
-using static Common.Util;
-using static Common.Log;
 
-//TODO: Remove the enormous amount of code duplicaiton. (I am way to lazy right now)
 
 public static class API
 {
@@ -23,14 +20,10 @@ public static class API
     /// </exception>
     public static async Task<User?> FetchUser(Token token)
     {
-        var response = await Fetch(endpoint: "https://discord.com/api/users/@me", transformers: httpClient =>
-        {
-            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(token.TokenType, token.AccessToken);
-        });
+        var response = await FetchUserRaw(token);
 
         if (response is null)
         {
-            Log.Logger.Debug("The provided token is wrong");
             // This assumes that every fetch error unrelated to HttpRequestException 
             // is due to a wrongly provided code.
             return null;
@@ -61,6 +54,37 @@ public static class API
     
     
     /// <summary>
+    /// Fetches the current user's info from the Discord API using the provided token.
+    /// </summary>
+    /// <param name="token">An access token containing the token type and access token string.</param>
+    /// <returns>
+    /// The HTTP Response containing the Discord information of the user, or <c>null</c> if the request fails or is rate-limited.
+    /// </returns>
+    /// <exception cref="HttpRequestException">
+    /// Thrown when the HTTP request fails due to network issues or an invalid response from the server.
+    /// </exception>
+    public static async Task<HttpResponseMessage?> FetchUserRaw(Token token)
+    {
+        var response = await Fetch(endpoint: "https://discord.com/api/users/@me", transformers: httpClient =>
+        {
+            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(token.TokenType, token.AccessToken);
+        });
+
+        if (response is null)
+        {
+            Log.Logger.Debug("The provided token is wrong");
+            // This assumes that every fetch error unrelated to HttpRequestException 
+            // is due to a wrongly provided code.
+            return null;
+        }
+        else
+        {
+            return response;
+        }
+
+    }
+    
+    /// <summary>
     /// Fetches the all guilds of the user from the Discord API using the provided token.
     /// </summary>
     /// <param name="token">An access token containing the token type and access token string.</param>
@@ -89,6 +113,58 @@ public static class API
             return response;
         }
 
+    }
+
+    /// <summary>
+    /// Fetches information about a specific guild (server) from the Discord API using the provided token.
+    /// </summary>
+    /// <param name="token">An access token containing the token type and access token string.</param>
+    /// <param name="guildId">The ID of the Discord guild (server) to fetch.</param>
+    /// <returns>
+    /// The HTTP response containing the guild information, or <c>null</c> if the request fails or is rate-limited.
+    /// </returns>
+    /// <exception cref="HttpRequestException">
+    /// Thrown when the HTTP request fails due to network issues or an invalid response from the server.
+    /// </exception>
+    public static async Task<HttpResponseMessage?> FetchGuildInfo(Token token, string guildId)
+    {
+        var endpoint = $"https://discord.com/api/guilds/{guildId}";
+        var response = await Fetch(endpoint: endpoint, transformers: httpClient =>
+        {
+            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(token.TokenType, token.AccessToken);
+        });
+        if (response is null)
+        {
+            Log.Logger.Debug($"Failed to fetch guild info for guild {guildId}");
+            return null;
+        }
+        return response;
+    }
+
+    /// <summary>
+    /// Fetches all channels for a specific guild (server) from the Discord API using the provided token.
+    /// </summary>
+    /// <param name="token">An access token containing the token type and access token string.</param>
+    /// <param name="guildId">The ID of the Discord guild (server) to fetch channels from.</param>
+    /// <returns>
+    /// The HTTP response containing the list of channels, or <c>null</c> if the request fails or is rate-limited.
+    /// </returns>
+    /// <exception cref="HttpRequestException">
+    /// Thrown when the HTTP request fails due to network issues or an invalid response from the server.
+    /// </exception>
+    public static async Task<HttpResponseMessage?> FetchGuildChannels(Token token, string guildId)
+    {
+        var endpoint = $"https://discord.com/api/guilds/{guildId}/channels";
+        var response = await Fetch(endpoint: endpoint, transformers: httpClient =>
+        {
+            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(token.TokenType, token.AccessToken);
+        });
+        if (response is null)
+        {
+            Log.Logger.Debug($"Failed to fetch channels for guild {guildId}");
+            return null;
+        }
+        return response;
     }
 
     /// <summary>

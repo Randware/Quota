@@ -1,12 +1,12 @@
 [jwt]
-secret = "your_jwt_secret"
-issuer = "your_issuer"
-audience = "your_audience"
+secret = "49y5qOJ5/WA8Jpn5eqlNUA/iWNbdVg6pJhxYZsD4Wwb/qTnWr+Z9CM6FzxwupQDyjQF8/Ee09l//kPcywRtyPw=="
+issuer = "Randware.org"
+audience = "Quota"
 expiryMinutes = 5
 
 [oauth]
-id = "your_discord_client_id"
-secret = "your_discord_client_secret"
+id = "1331219516549501019"
+secret = "FFMDTE6CWb92mwQ3ivb-cfJCCzHqQPJU"
 apiEndpoint = "https://discord.com/api/v10"
 
 [openapi]
@@ -16,5 +16,4 @@ enabled = true
 port = 5000
 
 [bot]
-token = "your_bot_token"
-
+token = "MTMzMTIxOTUxNjU0OTUwMTAxOQ.G1T4oL.1QqPQefvv-ygf7skpAZutT-9lX8HqmjosgEMqA"

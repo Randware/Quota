@@ -25,20 +25,37 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
         [Summary("image", "An image attachment for the quote")] IAttachment? image = null,
         [Summary("discord_user", "Tag the Discord user if they're in the server")] IUser? author = null)
     {
+        // Quick validation first - keep it minimal to avoid timeout
+        if (string.IsNullOrWhiteSpace(content) && image == null)
+        {
+            await RespondAsync("You must provide either text content or an image for the quote.", ephemeral: true);
+            return;
+        }
+
+        // Check basic permissions before starting
+        if (!await CheckChannelPermissions())
+        {
+            return; // Error message already sent
+        }
+
+        // Defer immediately to prevent interaction timeout
         try
         {
-            // Validate that at least content or image is provided
-            if (string.IsNullOrWhiteSpace(content) && image == null)
-            {
-                await RespondAsync("You must provide either text content or an image for the quote.", ephemeral: true);
-                return;
-            }
-
+            await DeferAsync();
+        }
+        catch (Discord.Net.HttpException ex) when (ex.DiscordCode == DiscordErrorCode.UnknownInteraction)
+        {
             using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
             {
-                // Defer the response since we'll be doing database operations
-                await DeferAsync();
+                Log.Logger.Warning("Interaction expired before defer in guild {GuildId}", Context.Guild.Id);
+            }
+            return;
+        }
 
+        try
+        {
+            using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
+            {
                 // Get or create guild
                 var guild = await _storage.GetGuildByDiscordIdAsync(Context.Guild.Id.ToString());
                 if (guild == null)
@@ -84,22 +101,23 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                 }
 
                 // Create or get the quotee profile
-                var quoteeProfile = quotedUser?.QuoteeProfiles.FirstOrDefault();
+                var quoteeProfile = quotedUser?.QuoteeProfiles?.FirstOrDefault();
                 if (quoteeProfile == null)
                 {
-                    // Create new quotee profile
                     quoteeProfile = new Quotee
                     {
                         ID = Guid.NewGuid(),
-                        Name = quotee, // Use the provided quotee name
-                        UserID = quotedUser?.ID // This will be null for external quotees
+                        Name = quotee,
+                        UserID = quotedUser?.ID
                     };
 
                     if (quotedUser != null)
                     {
-                        quotedUser.QuoteeProfiles = new List<Quotee> { quoteeProfile };
+                        if (quotedUser.QuoteeProfiles == null)
+                            quotedUser.QuoteeProfiles = new List<Quotee>();
+                        quotedUser.QuoteeProfiles.Add(quoteeProfile);
                         var updatedUser = await _storage.UpdateUserAsync(quotedUser);
-                        if (updatedUser == null)
+                        if (updatedUser == null || updatedUser.QuoteeProfiles == null || !updatedUser.QuoteeProfiles.Any())
                         {
                             await FollowupAsync("Error creating quote: Could not update user profile.", ephemeral: true);
                             return;
@@ -118,7 +136,6 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                 var quote = new Quote
                 {
                     ID = Guid.NewGuid(),
-                    MessageID = Context.Interaction.Id.ToString(),
                     Content = string.IsNullOrWhiteSpace(content) ? null : content,
                     MediaUrls = mediaUrl,
                     GuildID = guild.ID,
@@ -126,6 +143,7 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                     CreatedAt = DateTime.UtcNow,
                     Upvotes = 0,
                     Downvotes = 0
+                    // Do NOT set MessageID yet
                 };
 
                 // Create and assign QuoteQuotee relationship
@@ -138,10 +156,7 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                 };
                 quote.QuoteQuotees = new List<QuoteQuotee> { quoteQuotee };
 
-                // Save the quote
-                quote = await _storage.CreateQuoteAsync(quote);
-
-                // Build the response embed
+                // Build the response embed (before saving to DB)
                 bool isImage = false, isVideo = false;
                 if (image != null)
                 {
@@ -160,7 +175,6 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                 bool hasMedia = !string.IsNullOrWhiteSpace(mediaUrl);
                 if (!hasContent && hasMedia)
                 {
-                    // Only media: don't show the link if it's an image, just let Discord embed it
                     displayContent = isImage ? "" : mediaUrl;
                 }
                 else if (hasContent && !hasMedia)
@@ -173,13 +187,12 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                 }
                 else if (hasContent && hasMedia)
                 {
-                    // Both: show text, and only show the link if it's a video
                     displayContent = isImage ? content : $"{content}\n{mediaUrl}";
                 }
 
                 var embed = new EmbedBuilder()
                     .WithDescription(displayContent)
-                    .WithFooter($"Submitted by {Context.User.Username}")
+                    .WithFooter($"Submitted by {Context.User.Username}", Context.User.GetAvatarUrl())
                     .WithTimestamp(quote.CreatedAt ?? DateTimeOffset.UtcNow)
                     .WithColor(Color.Blue);
 
@@ -213,10 +226,15 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                             emote: new Emoji(guild.Config.DownvoteEmoji));
                 }
 
+                // Send the message and get the message ID
                 var message = await FollowupAsync(
                     embed: embed.Build(),
                     components: components.Build()
                 );
+
+                // Now set the MessageID and save the quote
+                quote.MessageID = message.Id.ToString();
+                quote = await _storage.CreateQuoteAsync(quote);
 
                 // If it's a video, send the link as a plain message so Discord previews it
                 if (isVideo && !string.IsNullOrWhiteSpace(mediaUrl))
@@ -227,17 +245,20 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                 Log.Logger.Information("Created quote {QuoteId} in guild {GuildId}", quote.ID, Context.Guild.Id);
             }
         }
-        catch (Exception ex)
+        catch (Discord.Net.HttpException ex) when (ex.DiscordCode == DiscordErrorCode.UnknownInteraction)
         {
             using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
             {
-                Log.Logger.Error(ex, "Error creating quote in guild {GuildId}", Context.Guild.Id);
-                await FollowupAsync("Sorry, there was an error creating your quote.", ephemeral: true);
+                Log.Logger.Warning("Interaction expired during quote creation in guild {GuildId}", Context.Guild.Id);
             }
+        }
+        catch (Exception ex)
+        {
+            await HandleGenericError(ex, "creating your quote", Context.Guild.Id);
+            throw; // Rethrow for unexpected errors
         }
     }
 
-    // Add upvote/downvote button handlers
     [ComponentInteraction("quote:upvote:*")]
     public async Task HandleUpvote(string quoteId)
     {
@@ -311,7 +332,6 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                 {
                     userUpvoted = prevVote.IsUpvote;
                 }
-                // else: same vote, do nothing
 
                 if (changed)
                 {
@@ -323,11 +343,11 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                 var guild = await _storage.GetGuildByDiscordIdAsync(Context.Guild.Id.ToString());
                 if (guild?.Config == null)
                 {
-                    await RespondAsync("Error updating vote display.", ephemeral: true);
+                    await RespondAsync("Error: Guild configuration not found.", ephemeral: true);
                     return;
                 }
 
-                // Update the message with new vote counts and selected state
+                // Build updated components
                 var components = new ComponentBuilder()
                     .WithButton(
                         label: $"Upvote ({quote.Upvotes})",
@@ -337,27 +357,227 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                     .WithButton(
                         label: $"Downvote ({quote.Downvotes})",
                         customId: $"quote:downvote:{quote.ID}",
-                        style: (!userUpvoted && prevVote != null && prevVote.IsUpvote == false) ? ButtonStyle.Danger : ButtonStyle.Secondary,
+                        style: !userUpvoted ? ButtonStyle.Danger : ButtonStyle.Secondary,
                         emote: new Emoji(guild.Config.DownvoteEmoji));
 
-                // Get the message from the component interaction
-                var message = ((IComponentInteraction)Context.Interaction).Message;
+                // Try to update the message
+                await TryUpdateMessage(components, quote, changed);
+            }
+        }
+        catch (Discord.Net.HttpException ex) when (ex.DiscordCode == DiscordErrorCode.UnknownInteraction)
+        {
+            using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
+            {
+                Log.Logger.Warning("Interaction expired during vote handling for quote {QuoteId} in guild {GuildId}", quoteId, Context.Guild.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            await HandleGenericError(ex, "processing your vote", Context.Guild.Id, quoteId);
+        }
+    }
+
+    private async Task TryUpdateMessage(ComponentBuilder components, Quote quote, bool voteChanged)
+    {
+        try
+        {
+            // Get the message from the component interaction
+            var message = ((IComponentInteraction)Context.Interaction).Message;
+            
+            if (message != null)
+            {
+                // Check if we have permission to modify the message
+                var botUser = Context.Guild.GetUser(Context.Client.CurrentUser.Id);
+                var channelPerms = botUser.GetPermissions(Context.Channel as IGuildChannel);
+
+                if (!channelPerms.ManageMessages)
+                {
+                    if (!Context.Interaction.HasResponded)
+                        await RespondAsync(
+                            $"✅ Vote recorded! This quote now has **{quote.Upvotes}** upvotes and **{quote.Downvotes}** downvotes.\n" +
+                            "⚠️ *I need 'Manage Messages' permission in this channel to update button displays.*", 
+                            ephemeral: true
+                        );
+                    
+                    using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
+                    {
+                        Log.Logger.Warning("Missing ManageMessages permission in channel {ChannelId} ({ChannelName}) in guild {GuildId}", 
+                            Context.Channel.Id, (Context.Channel as IGuildChannel)?.Name, Context.Guild.Id);
+                    }
+                    return;
+                }
+
                 await message.ModifyAsync(msg =>
                 {
                     msg.Components = components.Build();
                 });
 
-                // Do not send a message/response
-                await DeferAsync();
+                if (!Context.Interaction.HasResponded)
+                    await DeferAsync();
             }
+            else
+            {
+                if (!Context.Interaction.HasResponded)
+                    await RespondAsync(
+                        $"✅ Vote recorded! This quote now has **{quote.Upvotes}** upvotes and **{quote.Downvotes}** downvotes.", 
+                        ephemeral: true
+                    );
+            }
+        }
+        catch (Discord.Net.HttpException ex) when (ex.DiscordCode == DiscordErrorCode.MissingPermissions)
+        {
+            if (!Context.Interaction.HasResponded)
+                await RespondAsync(
+                    $"✅ Vote recorded! This quote now has **{quote.Upvotes}** upvotes and **{quote.Downvotes}** downvotes.\n" +
+                    "⚠️ *I'm missing permissions to update the button display in this channel.*", 
+                    ephemeral: true
+                );
+
+            using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
+            {
+                Log.Logger.Warning("Missing permissions to modify message in channel {ChannelId} ({ChannelName}) in guild {GuildId}: {Error}", 
+                    Context.Channel.Id, (Context.Channel as IGuildChannel)?.Name, Context.Guild.Id, ex.Message);
+            }
+        }
+        catch (Discord.Net.HttpException ex) when (ex.DiscordCode == DiscordErrorCode.UnknownMessage)
+        {
+            if (!Context.Interaction.HasResponded)
+                await RespondAsync(
+                    $"✅ Vote recorded! This quote now has **{quote.Upvotes}** upvotes and **{quote.Downvotes}** downvotes.\n" +
+                    "ℹ️ *The original quote message no longer exists.*", 
+                    ephemeral: true
+                );
+
+            using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
+            {
+                Log.Logger.Information("Original quote message deleted in channel {ChannelId} in guild {GuildId}", 
+                    Context.Channel.Id, Context.Guild.Id);
+            }
+        }
+        catch (Discord.Net.HttpException ex) when (ex.DiscordCode == DiscordErrorCode.UnknownInteraction)
+        {
+            // Interaction expired - log but don't try to respond
+            using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
+            {
+                Log.Logger.Warning("Interaction expired while updating message in guild {GuildId}", Context.Guild.Id);
+            }
+        }
+        catch (Discord.Net.HttpException ex)
+        {
+            if (!Context.Interaction.HasResponded)
+                await RespondAsync(
+                    $"✅ Vote recorded! This quote now has **{quote.Upvotes}** upvotes and **{quote.Downvotes}** downvotes.\n" +
+                    $"⚠️ *Unable to update display: {ex.Reason ?? "Unknown Discord API error"}*", 
+                    ephemeral: true
+                );
+
+            using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
+            {
+                Log.Logger.Warning("Discord API error updating message in guild {GuildId}: {Error} (Code: {Code})", 
+                    Context.Guild.Id, ex.Message, ex.DiscordCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log and rethrow unexpected exceptions
+            using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
+            {
+                Log.Logger.Error(ex, "Unexpected error updating message in guild {GuildId}", Context.Guild.Id);
+            }
+            throw;
+        }
+    }
+
+    private async Task<bool> CheckChannelPermissions()
+    {
+        try
+        {
+            var botUser = Context.Guild.GetUser(Context.Client.CurrentUser.Id);
+            var channelPerms = botUser.GetPermissions(Context.Channel as IGuildChannel);
+
+            var missingPerms = new List<string>();
+
+            if (!channelPerms.ViewChannel)
+                missingPerms.Add("View Channel");
+            if (!channelPerms.SendMessages)
+                missingPerms.Add("Send Messages");
+            if (!channelPerms.EmbedLinks)
+                missingPerms.Add("Embed Links");
+
+            if (missingPerms.Any())
+            {
+                var permissionList = string.Join(", ", missingPerms);
+                await RespondAsync(
+                    $"❌ I'm missing required permissions in this channel: **{permissionList}**\n" +
+                    "Please ask a server administrator to grant these permissions.", 
+                    ephemeral: true
+                );
+
+                using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
+                {
+                    Log.Logger.Warning("Missing required permissions in channel {ChannelId} ({ChannelName}) in guild {GuildId}: {MissingPerms}", 
+                        Context.Channel.Id, (Context.Channel as IGuildChannel)?.Name, Context.Guild.Id, permissionList);
+                }
+                return false;
+            }
+
+            // Log useful permission info for debugging
+            using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
+            {
+                Log.Logger.Debug("Channel permissions in {ChannelId} ({ChannelName}): ManageMessages={ManageMessages}, AddReactions={AddReactions}, UseExternalEmojis={UseExternalEmojis}", 
+                    Context.Channel.Id, (Context.Channel as IGuildChannel)?.Name, channelPerms.ManageMessages, channelPerms.AddReactions, channelPerms.UseExternalEmojis);
+            }
+
+            return true;
         }
         catch (Exception ex)
         {
             using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
             {
-                Log.Logger.Error(ex, "Error handling vote for quote {QuoteId}", quoteId);
-                // Do not send a message
+                Log.Logger.Error(ex, "Error checking permissions in channel {ChannelId} in guild {GuildId}", 
+                    Context.Channel.Id, Context.Guild.Id);
+            }
+
+            await RespondAsync("❌ Error checking permissions. Please try again.", ephemeral: true);
+            return false;
+        }
+    }
+
+    private async Task HandleGenericError(Exception ex, string action, ulong guildId, Guid? quoteId = null)
+    {
+        try
+        {
+            await FollowupAsync($"Sorry, there was an error {action}.", ephemeral: true);
+        }
+        catch (Discord.Net.HttpException httpEx) when (httpEx.DiscordCode == DiscordErrorCode.UnknownInteraction)
+        {
+            // Can't send followup, interaction expired
+        }
+        catch
+        {
+            // Swallow to avoid double error
+        }
+
+        using (LogContext.PushProperty("SourceContext", "Discord.Commands"))
+        {
+            if (quoteId.HasValue)
+            {
+                Log.Logger.Error(ex, "Error {Action} for quote {QuoteId} in guild {GuildId}", action, quoteId.Value, guildId);
+            }
+            else
+            {
+                Log.Logger.Error(ex, "Error {Action} in guild {GuildId}", action, guildId);
             }
         }
+    }
+
+    public IEnumerable<IChannel> GetGuildChannels(ulong guildId)
+    {
+        return Context.Client.GetGuild(guildId)?.Channels ?? Enumerable.Empty<IChannel>();
+    }
+
+    public IEnumerable<ITextChannel> GetGuildTextChannels(ulong guildId)
+    {
+        return Context.Client.GetGuild(guildId)?.TextChannels ?? Enumerable.Empty<ITextChannel>();
     }
 }
