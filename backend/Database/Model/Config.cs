@@ -9,12 +9,12 @@ public class EmojiConfig
 
     public bool IsCustom => Type == "custom" && !string.IsNullOrEmpty(Id);
 
-    public string? ToFrontendUrl()
+    public string? ToFrontendUrl(UInt16 size = 128)
     {
         if (!IsCustom) return null;
-        var ext = Animated ? "gif" : "png";
-        return $"https://cdn.discordapp.com/emojis/{Id}.{ext}";
-    }
+        var ext = Animated ? "gif" : "webp";
+        return $"https://cdn.discordapp.com/emojis/{Id}.{ext}?size={size}";
+    }   
 }
 
 public class GuildConfig
