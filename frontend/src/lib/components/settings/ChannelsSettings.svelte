@@ -7,18 +7,17 @@
 	import AddChannelMenu from './AddChannelMenu.svelte';
 	import { fly } from 'svelte/transition';
 
-	let allChannels: Channel[] = [
-		{ id: 'testid', name: 'john-channel' },
-		{ id: '123123412451224', name: 'am-a-channel' }
-	];
+	let { settings = $bindable(), allChannels }: { settings: Settings; allChannels: Channel[] } =
+		$props<{
+			settings: Settings;
+			allChannels: Channel[];
+		}>();
 
 	let addChannels: Channel[] = $derived(
 		allChannels.filter(
 			(c: Channel) => !settings.allowedChannels.find((a: Channel) => a.id === c.id)
 		)
 	);
-
-	let { settings = $bindable() }: { settings: Settings } = $props<{ settings: Settings }>();
 
 	function removeChannel(channel: Channel) {
 		settings.allowedChannels = settings.allowedChannels.filter((c: Channel) => c.id !== channel.id);

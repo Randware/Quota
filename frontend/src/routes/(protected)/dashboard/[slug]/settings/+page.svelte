@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Guild, Settings } from '$lib/server/types';
+	import type { Channel, Guild, Settings } from '$lib/server/types';
 	import type { ActionResult, SubmitFunction } from '@sveltejs/kit';
 	import { page } from '$app/state';
 	import ChannelsSettings from '$lib/components/settings/ChannelsSettings.svelte';
@@ -10,6 +10,7 @@
 	import { fly } from 'svelte/transition';
 
 	let settingsPromise: Promise<Settings> = $state(page.data.settings);
+	let allChannels: Promise<Channel[]> = $derived(page.data.allChannels);
 	let guild: Guild = page.data.guild;
 
 	let initialSettings = $state<Settings | null>(null);
@@ -59,13 +60,13 @@
 	<div class="text-light text-2xl font-semibold">Settings</div>
 
 	<div class="grid grid-cols-1 gap-8 xl:grid-cols-2">
-		{#await settingsPromise}
+		{#await Promise.all([settingsPromise, allChannels])}
 			<SkeletonSquare height={700} />
 			<SkeletonSquare height={500} />
 			<SkeletonSquare height={300} />
-		{:then}
+		{:then [_, allChannels]}
 			{#if workingSettings}
-				<ChannelsSettings bind:settings={workingSettings} />
+				<ChannelsSettings bind:settings={workingSettings} {allChannels} />
 				<VotingSettings bind:settings={workingSettings} />
 				<CommentsSettings bind:settings={workingSettings} />
 			{/if}

@@ -1,14 +1,15 @@
-import { getGuildSettings, updateGuildSettings } from '$lib/server/settings';
-import type { Guild, Settings } from '$lib/server/types';
+import { getGuildChannels, getGuildSettings, updateGuildSettings } from '$lib/server/settings';
+import type { Channel, Guild, Settings } from '$lib/server/types';
 import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ parent }) => {
   const { guild }: { guild: Guild } = await parent();
   const settings: Promise<Settings> = getGuildSettings(guild);
+  const allChannels: Promise<Channel[]> = getGuildChannels(guild);
 
   //  TODO: Load all channels here somehow
 
-  return { settings };
+  return { settings, allChannels };
 };
 
 export const actions: Actions = {
