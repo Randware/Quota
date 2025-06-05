@@ -12,12 +12,14 @@ namespace API
         private readonly QuotaContext _db;
         private readonly string _clientId;
         private readonly string _clientSecret;
+        private readonly string _botToken;
 
-        public DiscordTokenService(QuotaContext db)
+        public DiscordTokenService(QuotaContext db, string clientId, string clientSecret, string botToken)
         {
             _db = db;
-            _clientId = Environment.GetEnvironmentVariable("DISCORD_CLIENT_ID")!;
-            _clientSecret = Environment.GetEnvironmentVariable("DISCORD_CLIENT_SECRET")!;
+            _clientId = clientId;
+            _clientSecret = clientSecret;
+            _botToken = botToken;
         }
 
         public async Task<Token?> GetValidTokenForUserAsync(string discordUserId, IEnumerable<string>? requiredScopes = null)
@@ -39,13 +41,14 @@ namespace API
                 TokenType = "Bearer",
                 ExpiresIn = (long)(discordToken.ExpiresAt - discordToken.CreatedAt).TotalSeconds,
                 CreatedAt = discordToken.CreatedAt,
-                Scope = new HashSet<string>((discordToken.Scope ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                Scope = new HashSet<string>((discordToken.Scope ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries))
             };
 
             // Scope validation
-            if (requiredScopes != null && requiredScopes.Any())
+            var requiredScopesList = requiredScopes?.ToList();
+            if (requiredScopesList != null && requiredScopesList.Count > 0)
             {
-                var missing = requiredScopes.Where(scope => !token.Scope.Contains(scope)).ToList();
+                var missing = requiredScopesList.Where(scope => !token.Scope.Contains(scope)).ToList();
                 if (missing.Count > 0)
                     return null;
             }
@@ -53,7 +56,7 @@ namespace API
             // Refresh if token is expired or will expire in the next 60 seconds
             if (token.Remaining() < 60)
             {
-                var client = new Client(_clientId, _clientSecret);
+                var client = new Client(_clientId, _clientSecret, _botToken);
                 var refreshed = await Common.OAuth.API.RefreshToken(token, client);
                 if (refreshed == null)
                     return null;
@@ -76,4 +79,3 @@ namespace API
         }
     }
 }
-

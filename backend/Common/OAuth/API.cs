@@ -116,9 +116,9 @@ public static class API
     }
 
     /// <summary>
-    /// Fetches information about a specific guild (server) from the Discord API using the provided token.
+    /// Fetches information about a specific guild (server) from the Discord API using the provided bot client.
     /// </summary>
-    /// <param name="token">An access token containing the token type and access token string.</param>
+    /// <param name="client">A <see cref="Client"/> object representing the Discord bot (must have BotToken and ApiEndpoint set).</param>
     /// <param name="guildId">The ID of the Discord guild (server) to fetch.</param>
     /// <returns>
     /// The HTTP response containing the guild information, or <c>null</c> if the request fails or is rate-limited.
@@ -126,12 +126,12 @@ public static class API
     /// <exception cref="HttpRequestException">
     /// Thrown when the HTTP request fails due to network issues or an invalid response from the server.
     /// </exception>
-    public static async Task<HttpResponseMessage?> FetchGuildInfo(Token token, string guildId)
+    public static async Task<HttpResponseMessage?> FetchGuildInfo(Client client, string guildId)
     {
-        var endpoint = $"https://discord.com/api/guilds/{guildId}";
-        var response = await Fetch(endpoint: endpoint, transformers: httpClient =>
+        Log.Logger.Information(client.ToString());
+        var response = await Fetch(endpoint: $"{client.ApiEndpoint}/guilds/{guildId}", transformers: httpClient =>
         {
-            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(token.TokenType, token.AccessToken);
+            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bot", client.BotToken);
         });
         if (response is null)
         {
@@ -142,9 +142,9 @@ public static class API
     }
 
     /// <summary>
-    /// Fetches all channels for a specific guild (server) from the Discord API using the provided token.
+    /// Fetches all channels for a specific guild (server) from the Discord API using the provided bot client.
     /// </summary>
-    /// <param name="token">An access token containing the token type and access token string.</param>
+    /// <param name="client">A <see cref="Client"/> object representing the Discord bot (must have BotToken and ApiEndpoint set).</param>
     /// <param name="guildId">The ID of the Discord guild (server) to fetch channels from.</param>
     /// <returns>
     /// The HTTP response containing the list of channels, or <c>null</c> if the request fails or is rate-limited.
@@ -152,12 +152,11 @@ public static class API
     /// <exception cref="HttpRequestException">
     /// Thrown when the HTTP request fails due to network issues or an invalid response from the server.
     /// </exception>
-    public static async Task<HttpResponseMessage?> FetchGuildChannels(Token token, string guildId)
+    public static async Task<HttpResponseMessage?> FetchGuildChannels(Client client, string guildId)
     {
-        var endpoint = $"https://discord.com/api/guilds/{guildId}/channels";
-        var response = await Fetch(endpoint: endpoint, transformers: httpClient =>
+        var response = await Fetch(endpoint: $"{client.ApiEndpoint}/guilds/{guildId}/channels", transformers: httpClient =>
         {
-            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(token.TokenType, token.AccessToken);
+            httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bot", client.BotToken);
         });
         if (response is null)
         {
@@ -328,7 +327,7 @@ public static class API
             {
                 transformer(httpClient);
             }
-            
+
             using (LogContext.PushProperty("SourceContext", "Discord.OAuth"))
             {
                 //TODO: Make retry attempts configurable

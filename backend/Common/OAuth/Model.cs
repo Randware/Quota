@@ -90,15 +90,18 @@ public class Client
     public string ID { get; init; }
     public string Secret { get; init; }
     public string ApiEndpoint { get; init; }
+    
+    public string BotToken { get; set; }
 
-    public Client(string id, string secret, string? apiEndpoint = null)
+    public Client(string id, string secret, string botToken, string? apiEndpoint = null)
     {
         ID = id ?? throw new ArgumentNullException(nameof(id));
         Secret = secret ?? throw new ArgumentNullException(nameof(secret));
+        BotToken = botToken ?? throw new ArgumentNullException(nameof(botToken));
         var endpoint = (apiEndpoint ?? "https://discord.com/api/v10");
         ApiEndpoint = endpoint.EndsWith("/") ? endpoint[..^1] : endpoint;
     }
 
-    public override string ToString() => $"Client {{\n\tID: {ID}\n\tSecret: {Secret}\n\tAPI Endpoint: {ApiEndpoint}\n}}";
+    public override string ToString() => $"Client {{\n\tID: {ID}\n\tSecret: {Secret}\n\tBot Token: {BotToken}\n\tAPI Endpoint: {ApiEndpoint}\n}}";
 }
 
