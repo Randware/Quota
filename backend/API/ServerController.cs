@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Common.OAuth;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using Common;
 using Database.Model;
 
 namespace API.Controllers
@@ -17,12 +18,14 @@ namespace API.Controllers
         private readonly QuotaContext _db;
         private readonly JwtService _jwtService;
         private readonly DiscordTokenService _discordTokenService;
+        private readonly Common.OAuth.Client _discordClient;
 
-        public ServerController(QuotaContext db, JwtService jwtService, DiscordTokenService discordTokenService)
+        public ServerController(QuotaContext db, JwtService jwtService, DiscordTokenService discordTokenService, Common.OAuth.Client discordClient)
         {
             _db = db;
             _jwtService = jwtService;
             _discordTokenService = discordTokenService;
+            _discordClient = discordClient;
         }
 
         /// <summary>
@@ -51,7 +54,8 @@ namespace API.Controllers
             if (token == null)
                 return StatusCode(403, "No valid Discord token found for user, or required scopes are missing, or token refresh failed.");
 
-            var response = await Common.OAuth.API.FetchGuildInfo(token, id);
+            Log.Logger.Information(_discordClient.BotToken);
+            var response = await Common.OAuth.API.FetchGuildInfo(_discordClient, id);
             if (response == null)
                 return StatusCode(502, "Failed to fetch guild info from Discord API.");
             var content = await response.Content.ReadAsStringAsync();
@@ -84,7 +88,7 @@ namespace API.Controllers
             if (token == null)
                 return StatusCode(403, "No valid Discord token found for user, or required scopes are missing, or token refresh failed.");
 
-            var response = await Common.OAuth.API.FetchGuildChannels(token, id);
+            var response = await Common.OAuth.API.FetchGuildChannels(_discordClient, id);
             if (response == null)
                 return StatusCode(502, "Failed to fetch guild channels from Discord API.");
             var content = await response.Content.ReadAsStringAsync();

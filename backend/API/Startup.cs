@@ -39,6 +39,7 @@ public class Startup
         public string Id { get; set; }
         public string Secret { get; set; }
         public string ApiEndpoint { get; set; } = "https://discord.com/api/v10";
+        public string BotToken { get; set; }
     }
 
     public void ConfigureServices(IServiceCollection services)
@@ -51,6 +52,7 @@ public class Startup
                 var toml = Toml.Parse(File.ReadAllText("./config.toml")).ToModel();
                 var jwtSection = toml["jwt"] as TomlTable;
                 var oauthSection = toml["oauth"] as TomlTable;
+                var botSection = toml["bot"] as TomlTable;
                 var openApiSection = toml.ContainsKey("openapi") ? toml["openapi"] as TomlTable : null;
                 _openApiEnabled = openApiSection != null && openApiSection.ContainsKey("enabled") && (bool)openApiSection["enabled"];
 
@@ -81,7 +83,8 @@ public class Startup
                 {
                     Id = oauthSection["id"] as string,
                     Secret = oauthSection["secret"] as string,
-                    ApiEndpoint = oauthSection.ContainsKey("apiEndpoint") ? oauthSection["apiEndpoint"] as string : "https://discord.com/api/v10"
+                    ApiEndpoint = oauthSection.ContainsKey("apiEndpoint") ? oauthSection["apiEndpoint"] as string : "https://discord.com/api/v10",
+                    BotToken = botSection["token"] as string,
                 };
                 // Register config objects
                 services.AddSingleton(jwtConfig);
@@ -113,10 +116,16 @@ public class Startup
                 services.AddSingleton(sp => new Common.OAuth.Client(
                     oauthConfig.Id,
                     oauthConfig.Secret,
+                    oauthConfig.BotToken,
                     oauthConfig.ApiEndpoint
                 ));
                 // Register DiscordTokenService for DI
-                services.AddScoped<DiscordTokenService>();
+                services.AddScoped<DiscordTokenService>(sp =>
+                {
+                    var db = sp.GetRequiredService<QuotaContext>();
+                    var oauthConfig = sp.GetRequiredService<OAuthConfig>();
+                    return new DiscordTokenService(db, oauthConfig.Id, oauthConfig.Secret, oauthConfig.BotToken);
+                });
                 // Add JWT Bearer authentication
                 services.AddAuthentication(options =>
                 {
@@ -272,4 +281,3 @@ public class Startup
         }
     }
 }
-
