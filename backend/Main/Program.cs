@@ -22,6 +22,22 @@ public class Program
             Log.SetupLogging("logs");
             using (LogContext.PushProperty("SourceContext", "Main.Startup"))
             {
+                
+            // Only works in terminals that support ANSI escape codes, so be aware lol
+            var asciiArt =
+                "\n\x1b[1m\x1b[38;2;247;111;83m" +
+                "  ______      __    __    ______   .___________.    ___     \n" +
+                " /  __  \\    |  |  |  |  /  __  \\  |           |   /   \\    \n" +
+                "|  |  |  |   |  |  |  | |  |  |  | `---|  |----`  /  ^  \\   \n" +
+                "|  |  |  |   |  |  |  | |  |  |  |     |  |      /  /_\\  \\  \n" +
+                "|  `--'  '--.|  `--'  | |  `--'  |     |  |     /  _____  \\ \n" +
+                " \\_____\\_____\\\\______/   \\______/      |__|    /__/     \\__\\\n" +
+                "\x1b[0m" +
+                "\n" +
+                "\x1b[1m\x1b[38;2;255;255;255m" +
+                "                Made by Randware with \u2764\uFE0F                " +
+                "\x1b[0m\n";
+                Log.Logger.Information("\n" + asciiArt);
                 Log.Logger.Information("Starting Quota backend...");
 
                 // Read config

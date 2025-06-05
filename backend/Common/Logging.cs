@@ -3,6 +3,7 @@ using Serilog;
 using Serilog.Core;
 using Serilog.Exceptions;
 using Serilog.Events;
+using Serilog.Sinks.SystemConsole.Themes;
 
 namespace Common;
 
@@ -133,8 +134,9 @@ public static class Log
                 .Enrich.FromLogContext()
                 .Enrich.WithExceptionDetails()
                 // Configure output
-                .WriteTo.Console(outputTemplate: 
-                    "[{Timestamp:HH:mm:ss} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}")
+                .WriteTo.Console(
+                    outputTemplate: "[\x1b[38;2;120;220;255m{Timestamp:HH:mm:ss}\x1b[0m] [\x1b[1m\x1b[38;2;255;180;80m{Level:u3}\x1b[0m] [\x1b[38;2;180;255;120m{SourceContext}\x1b[0m] {Message:lj}{NewLine}{Exception}",
+                    theme: AnsiConsoleTheme.Literate)
                 .WriteTo.File(latest,
                     outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
 

@@ -31,22 +31,6 @@ public class Program
                 }
             });
 
-        // ASCII Art Welcome Banner with ANSI color (closest to #F76F53)
-        // Only works in terminals that support ANSI escape codes
-        var asciiArt =
-            "\x1b[1m\x1b[38;2;247;111;83m" +
-            "  ______      __    __    ______   .___________.    ___     \n" +
-            " /  __  \\    |  |  |  |  /  __  \\  |           |   /   \\    \n" +
-            "|  |  |  |   |  |  |  | |  |  |  | `---|  |----`  /  ^  \\   \n" +
-            "|  |  |  |   |  |  |  | |  |  |  |     |  |      /  /_\\  \\  \n" +
-            "|  `--'  '--.|  `--'  | |  `--'  |     |  |     /  _____  \\ \n" +
-            " \\_____\\_____\\\\______/   \\______/      |__|    /__/     \\__\\\n" +
-            "\x1b[0m" +
-            "\n" +
-            "\x1b[1m\x1b[38;2;255;255;255m" +
-            "                Made by Randware with \u2764\uFE0F                " +
-            "\x1b[0m\n";
-        Common.Log.Logger.Information("\n" + asciiArt);
 
         await host.RunAsync();
     }
@@ -80,4 +64,6 @@ public class Program
             .UseSerilog(); // Use Serilog as the logging provider
     }
 }
+
+
 
