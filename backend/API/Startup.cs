@@ -115,6 +115,8 @@ public class Startup
                     oauthConfig.Secret,
                     oauthConfig.ApiEndpoint
                 ));
+                // Register DiscordTokenService for DI
+                services.AddScoped<DiscordTokenService>();
                 // Add JWT Bearer authentication
                 services.AddAuthentication(options =>
                 {
@@ -270,3 +272,4 @@ public class Startup
         }
     }
 }
+

@@ -1,7 +1,6 @@
 ﻿using Common;
 using Microsoft.EntityFrameworkCore;
 using Database.Model;
-using Common.OAuth;
 using Serilog.Context;
 using User = Database.Model.User;
 
@@ -152,6 +151,10 @@ public class Storage
 
     public async Task<Quote> CreateQuoteAsync(Quote quote)
     {
+        // Validate MessageID is not null or empty
+        if (string.IsNullOrWhiteSpace(quote.MessageID))
+            throw new ArgumentException("Quote.MessageID must be set and non-empty.");
+
         return await LoggedOperation("creating quote", async () =>
         {
             // Clear any tracking to avoid conflicts

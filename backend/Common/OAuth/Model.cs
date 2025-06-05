@@ -5,24 +5,24 @@ namespace Common.OAuth;
 /// Represents all sorts of prameters the application received during the OAuth2 process.
 /// This includes Access & Refresh Token, Type of token, Scopes and expiry date
 ///</summary>
-public readonly struct Token
+public class Token
 {
-
-    public string AccessToken { get; init; }
-    public string RefreshToken { get; init; }
-    public string TokenType { get; init; }
+    public string AccessToken { get; set; }
+    public string RefreshToken { get; set; }
+    public string TokenType { get; set; }
     /// <summary>
     /// Original amount of seconds that indicate how many seconds the token expires in.
-    /// To get the live amount of seconds call the <code>Remeinig()</code>
+    /// To get the live amount of seconds call the <code>Remaining()</code>
     /// </summary>
-    public long ExpiresIn { get; init; }
-    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
-    public HashSet<string> Scope { get; init; }
+    public long ExpiresIn { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public HashSet<string> Scope { get; set; } = new();
     /// <summary>
     /// True once ExpiresIn is 0.
     /// </summary>
     public bool IsExpired => Remaining() <= 0;
 
+    public Token() { }
     public Token(string accessToken, string refreshToken, string tokenType, uint expiresIn, DateTime? createdAt = null, HashSet<string>? scope = null)
     {
         TokenType = tokenType ?? throw new ArgumentNullException(nameof(tokenType));
@@ -44,7 +44,6 @@ public readonly struct Token
     }
 
     public override string ToString() => $"Token {{\n\tAccess Token: {AccessToken}\n\tRefresh Token: {RefreshToken}\n\tToken Type: {TokenType}\n\tExpires in: {Remaining()} seconds\n\tScope: {string.Join(" ", Scope)}\n}}";
-
 }
 
 /// <summary>

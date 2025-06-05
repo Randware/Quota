@@ -6,6 +6,7 @@ using Common;
 using Database;
 using Database.Model;
 using Serilog.Context;
+using Microsoft.EntityFrameworkCore;
 
 namespace Bot;
 
@@ -22,7 +23,8 @@ public class QuotaBot
         var config = new DiscordSocketConfig
         {
             GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildMembers,
-            LogLevel = LogSeverity.Debug
+            LogLevel = LogSeverity.Debug,
+            MessageCacheSize = 1000 // Cache recent messages for button interactions
         };
 
         _client = new DiscordSocketClient(config);
@@ -76,12 +78,45 @@ public class QuotaBot
         {
             if (!_isReady)
             {
-                await interaction.RespondAsync("Bot is still starting up. Please try again in a moment.", ephemeral: true);
+                try
+                {
+                    await interaction.RespondAsync("Bot is still starting up. Please try again in a moment.", ephemeral: true);
+                }
+                catch (Exception ex)
+                {
+                    Log.Logger.Warning(ex, "Failed to respond to interaction during startup");
+                }
                 return;
             }
 
             var ctx = new SocketInteractionContext(_client, interaction);
-            await _interactions.ExecuteCommandAsync(ctx, _services);
+            try
+            {
+                await _interactions.ExecuteCommandAsync(ctx, _services);
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Failed to execute interaction command");
+                try
+                {
+                    var response = interaction.HasResponded 
+                        ? "Sorry, there was an error processing your request." 
+                        : "Sorry, there was an error processing your request.";
+                    
+                    if (!interaction.HasResponded)
+                    {
+                        await interaction.RespondAsync(response, ephemeral: true);
+                    }
+                    else
+                    {
+                        await interaction.FollowupAsync(response, ephemeral: true);
+                    }
+                }
+                catch (Exception followupEx)
+                {
+                    Log.Logger.Error(followupEx, "Failed to send error response for interaction");
+                }
+            }
         };
 
         // Start the client
@@ -97,20 +132,42 @@ public class QuotaBot
             {
                 Log.Logger.Information("Bot is connected and ready!");
                 _isReady = true;
+                
                 // Register commands globally
-                _ = _interactions.RegisterCommandsGloballyAsync();
-                Log.Logger.Information("Successfully registered global commands");
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _interactions.RegisterCommandsGloballyAsync();
+                        Log.Logger.Information("Successfully registered global commands");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Logger.Error(ex, "Failed to register global commands");
+                    }
+                });
                 
                 // Initial sync of all guilds in background, each with its own scope
                 foreach (var guild in _client.Guilds)
                 {
                     _ = Task.Run(async () =>
                     {
-                        using var scope = _services.CreateScope();
-                        var storage = scope.ServiceProvider.GetRequiredService<Storage>();
-                        await SyncGuildPermissions(guild, storage);
+                        try
+                        {
+                            using var scope = _services.CreateScope();
+                            var storage = scope.ServiceProvider.GetRequiredService<Storage>();
+                            await SyncGuildPermissions(guild, storage);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Logger.Error(ex, "Failed to sync permissions for guild {GuildId} during startup", guild.Id);
+                        }
                     });
                 }
+                
+                // Refresh recent quote buttons (optional feature)
+                _ = Task.Run(RefreshRecentQuoteButtons);
+                
                 Log.Logger.Information("Bot is now ready to handle commands");
             }
         }
@@ -122,15 +179,148 @@ public class QuotaBot
         return Task.CompletedTask;
     }
 
+    private async Task RefreshRecentQuoteButtons()
+    {
+        try
+        {
+            using (LogContext.PushProperty("SourceContext", "Discord.Bot"))
+            {
+                Log.Logger.Information("Starting refresh of recent quote buttons");
+                
+                using var scope = _services.CreateScope();
+                var storage = scope.ServiceProvider.GetRequiredService<Storage>();
+                
+                // Get quotes from the last 24 hours that might still have active buttons
+                var recentQuotes = await GetRecentQuotesWithMessageIds(storage, TimeSpan.FromHours(24));
+                var refreshCount = 0;
+                
+                foreach (var quote in recentQuotes)
+                {
+                    try
+                    {
+                        if (ulong.TryParse(quote.GuildDiscordId, out var guildId) && 
+                            ulong.TryParse(quote.MessageID, out var messageId))
+                        {
+                            var guild = _client.GetGuild(guildId);
+                            if (guild != null)
+                            {
+                                // Try to find the message in all text channels
+                                foreach (var channel in guild.TextChannels)
+                                {
+                                    try
+                                    {
+                                        var message = await channel.GetMessageAsync(messageId);
+                                        if (message is IUserMessage userMessage && message.Author.Id == _client.CurrentUser.Id)
+                                        {
+                                            // This is our quote message, refresh the buttons
+                                            await RefreshQuoteMessageButtons(userMessage, quote, storage);
+                                            refreshCount++;
+                                            break;
+                                        }
+                                    }
+                                    catch (Exception)
+                                    {
+                                        // Message not in this channel, continue searching
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Logger.Warning(ex, "Failed to refresh buttons for quote {QuoteId}", quote.ID);
+                    }
+                    
+                    // Small delay to avoid rate limiting
+                    await Task.Delay(100);
+                }
+                
+                Log.Logger.Information("Refreshed buttons for {Count} recent quotes", refreshCount);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Error(ex, "Failed to refresh recent quote buttons");
+        }
+    }
+
+    private async Task<List<QuoteWithGuildInfo>> GetRecentQuotesWithMessageIds(Storage storage, TimeSpan timeSpan)
+    {
+        try
+        {
+            var db = _services.GetRequiredService<QuotaContext>();
+            var cutoffTime = DateTime.UtcNow - timeSpan;
+            var quotes = await db.Quotes
+                .Where(q => q.CreatedAt >= cutoffTime && !string.IsNullOrEmpty(q.MessageID))
+                .Select(q => new QuoteWithGuildInfo
+                {
+                    ID = q.ID,
+                    MessageID = q.MessageID,
+                    GuildDiscordId = q.Guild.DiscordID,
+                    Upvotes = q.Upvotes,
+                    Downvotes = q.Downvotes
+                })
+                .ToListAsync();
+            return quotes;
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Error(ex, "Failed to get recent quotes with message IDs");
+            return new List<QuoteWithGuildInfo>();
+        }
+    }
+
+    private async Task RefreshQuoteMessageButtons(IUserMessage message, QuoteWithGuildInfo quote, Storage storage)
+    {
+        try
+        {
+            if (ulong.TryParse(quote.GuildDiscordId, out var guildId))
+            {
+                var guild = await storage.GetGuildByDiscordIdAsync(quote.GuildDiscordId);
+                if (guild?.Config != null)
+                {
+                    var components = new ComponentBuilder()
+                        .WithButton(
+                            label: $"Upvote ({quote.Upvotes})",
+                            customId: $"quote:upvote:{quote.ID}",
+                            style: ButtonStyle.Secondary,
+                            emote: new Emoji(guild.Config.UpvoteEmoji))
+                        .WithButton(
+                            label: $"Downvote ({quote.Downvotes})",
+                            customId: $"quote:downvote:{quote.ID}",
+                            style: ButtonStyle.Secondary,
+                            emote: new Emoji(guild.Config.DownvoteEmoji));
+
+                    await message.ModifyAsync(msg =>
+                    {
+                        msg.Components = components.Build();
+                    });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Warning(ex, "Failed to refresh buttons for message {MessageId}", message.Id);
+        }
+    }
+
     private async Task OnJoinedGuild(SocketGuild guild)
     {
         Log.Logger.Information("Joined new guild: {GuildName} ({GuildId})", guild.Name, guild.Id);
         
         _ = Task.Run(async () =>
         {
-            using var scope = _services.CreateScope();
-            var storage = scope.ServiceProvider.GetRequiredService<Storage>();
-            await SyncGuildPermissions(guild, storage);
+            try
+            {
+                using var scope = _services.CreateScope();
+                var storage = scope.ServiceProvider.GetRequiredService<Storage>();
+                await SyncGuildPermissions(guild, storage);
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Failed to sync permissions for newly joined guild {GuildId}", guild.Id);
+            }
         });
     }
 
@@ -141,9 +331,16 @@ public class QuotaBot
         // Only clean up user permissions but preserve guild configuration and quotes data
         _ = Task.Run(async () =>
         {
-            using var scope = _services.CreateScope();
-            var storage = scope.ServiceProvider.GetRequiredService<Storage>();
-            await CleanupGuildUserPermissions(guild.Id, storage);
+            try
+            {
+                using var scope = _services.CreateScope();
+                var storage = scope.ServiceProvider.GetRequiredService<Storage>();
+                await CleanupGuildUserPermissions(guild.Id, storage);
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Failed to cleanup permissions for left guild {GuildId}", guild.Id);
+            }
         });
     }
 
@@ -153,9 +350,16 @@ public class QuotaBot
         
         _ = Task.Run(async () =>
         {
-            using var scope = _services.CreateScope();
-            var storage = scope.ServiceProvider.GetRequiredService<Storage>();
-            await SyncGuildPermissions(guild, storage);
+            try
+            {
+                using var scope = _services.CreateScope();
+                var storage = scope.ServiceProvider.GetRequiredService<Storage>();
+                await SyncGuildPermissions(guild, storage);
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Failed to sync permissions for available guild {GuildId}", guild.Id);
+            }
         });
         return Task.CompletedTask;
     }
@@ -169,41 +373,83 @@ public class QuotaBot
     private async Task OnUserUpdated(SocketUser before, SocketUser after)
     {
         // Update user in all mutual guilds
+        var tasks = new List<Task>();
         foreach (var guild in _client.Guilds)
         {
             var guildUser = guild.GetUser(after.Id);
             if (guildUser != null)
             {
-                using var scope = _services.CreateScope();
-                var storage = scope.ServiceProvider.GetRequiredService<Storage>();
-                await UpdateUserPermissions(guildUser, storage);
+                tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var scope = _services.CreateScope();
+                        var storage = scope.ServiceProvider.GetRequiredService<Storage>();
+                        await UpdateUserPermissions(guildUser, storage);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Logger.Error(ex, "Failed to update user permissions for {UserId} in guild {GuildId}", after.Id, guild.Id);
+                    }
+                }));
             }
         }
+        await Task.WhenAll(tasks);
     }
 
     private async Task OnGuildMemberUpdated(Cacheable<SocketGuildUser, ulong> before, SocketGuildUser after)
     {
-        using var scope = _services.CreateScope();
-        var storage = scope.ServiceProvider.GetRequiredService<Storage>();
-        await UpdateUserPermissions(after, storage);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = _services.CreateScope();
+                var storage = scope.ServiceProvider.GetRequiredService<Storage>();
+                await UpdateUserPermissions(after, storage);
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Failed to update guild member permissions for {UserId} in guild {GuildId}", after.Id, after.Guild.Id);
+            }
+        });
     }
 
     private async Task OnUserJoined(SocketGuildUser user)
     {
         Log.Logger.Information("User joined guild: {Username} ({UserId}) in {GuildName}", user.Username, user.Id, user.Guild.Name);
         
-        using var scope = _services.CreateScope();
-        var storage = scope.ServiceProvider.GetRequiredService<Storage>();
-        await UpdateUserPermissions(user, storage);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = _services.CreateScope();
+                var storage = scope.ServiceProvider.GetRequiredService<Storage>();
+                await UpdateUserPermissions(user, storage);
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Failed to update permissions for joined user {UserId} in guild {GuildId}", user.Id, user.Guild.Id);
+            }
+        });
     }
 
     private async Task OnUserLeft(SocketGuild guild, SocketUser user)
     {
         Log.Logger.Information("User left guild: {Username} ({UserId}) from {GuildName}", user.Username, user.Id, guild.Name);
         
-        using var scope = _services.CreateScope();
-        var storage = scope.ServiceProvider.GetRequiredService<Storage>();
-        await RemoveUserPermissions(guild.Id, user.Id, storage);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = _services.CreateScope();
+                var storage = scope.ServiceProvider.GetRequiredService<Storage>();
+                await RemoveUserPermissions(guild.Id, user.Id, storage);
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error(ex, "Failed to remove permissions for left user {UserId} in guild {GuildId}", user.Id, guild.Id);
+            }
+        });
     }
 
     private async Task SyncGuildPermissions(SocketGuild guild, Storage storage)
@@ -236,23 +482,30 @@ public class QuotaBot
             // Remove permissions for users no longer in the guild
             await CleanupOrphanedPermissions(guild, dbGuild, storage);
 
-            // Update permissions for all current users
-            foreach (var user in guild.Users)
+            // Update permissions for all current users in batches to avoid overwhelming the database
+            var users = guild.Users.Where(u => !u.IsBot).ToList();
+            var batchSize = 10;
+            
+            for (int i = 0; i < users.Count; i += batchSize)
             {
-                if (!user.IsBot) // Skip bots
+                var batch = users.Skip(i).Take(batchSize);
+                var tasks = batch.Select(user => UpdateUserPermissions(user, storage));
+                await Task.WhenAll(tasks);
+                
+                // Small delay between batches
+                if (i + batchSize < users.Count)
                 {
-                    await UpdateUserPermissions(user, storage);
+                    await Task.Delay(100);
                 }
             }
 
-            Log.Logger.Information("Completed permission sync for guild: {GuildName}", guild.Name);
+            Log.Logger.Information("Completed permission sync for guild: {GuildName} ({UserCount} users)", guild.Name, users.Count);
         }
         catch (Exception ex)
         {
             Log.Logger.Error(ex, "Failed to sync permissions for guild {GuildId}", guild.Id);
         }
     }
-
 
     private async Task UpdateUserPermissions(SocketGuildUser user, Storage storage)
     {
@@ -267,13 +520,13 @@ public class QuotaBot
             
             // Use a transaction to prevent race conditions
             using var transaction = await db.Database.BeginTransactionAsync();
-            
+
             try
             {
                 // Remove existing permissions first (with proper concurrency handling)
-                var existingPermissions = db.Permissions
+                var existingPermissions = await db.Permissions
                     .Where(p => p.GuildConfigID == dbGuild.Config.ID && p.UserID == user.Id.ToString())
-                    .ToList();
+                    .ToListAsync();
 
                 if (existingPermissions.Any())
                 {
@@ -328,30 +581,21 @@ public class QuotaBot
 
                 // Add new permissions (avoid duplicates by using Distinct)
                 var uniquePermissions = permissionsToAdd.Distinct().ToList();
-                
+
                 foreach (var permissionType in uniquePermissions)
                 {
-                    // Double-check that this permission doesn't already exist
-                    var existingPerm = db.Permissions.FirstOrDefault(p => 
-                        p.GuildConfigID == dbGuild.Config.ID && 
-                        p.UserID == user.Id.ToString() && 
-                        p.PermissionType == permissionType);
-                    
-                    if (existingPerm == null)
+                    db.Permissions.Add(new Permission
                     {
-                        db.Permissions.Add(new Permission
-                        {
-                            GuildConfigID = dbGuild.Config.ID,
-                            UserID = user.Id.ToString(),
-                            PermissionType = permissionType
-                        });
-                    }
+                        GuildConfigID = dbGuild.Config.ID,
+                        UserID = user.Id.ToString(),
+                        PermissionType = permissionType
+                    });
                 }
 
                 await db.SaveChangesAsync();
                 await transaction.CommitAsync();
-                
-                Log.Logger.Debug("Updated permissions for user {Username} ({UserId}) in guild {GuildName}: {Permissions}", 
+
+                Log.Logger.Debug("Updated permissions for user {Username} ({UserId}) in guild {GuildName}: {Permissions}",
                     user.Username, user.Id, guild.Name, string.Join(", ", uniquePermissions));
             }
             catch
@@ -372,50 +616,22 @@ public class QuotaBot
         {
             using var scope = _services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<QuotaContext>();
-            
-            var dbGuildConfig = db.GuildConfigs.FirstOrDefault(gc => gc.Guild.DiscordID == guildId.ToString());
+
+            var dbGuildConfig = await db.GuildConfigs
+                .FirstOrDefaultAsync(gc => gc.Guild.DiscordID == guildId.ToString());
             if (dbGuildConfig == null) return;
 
-            // Use a more robust approach to handle concurrency
-            var permissions = db.Permissions
+            var permissions = await db.Permissions
                 .Where(p => p.GuildConfigID == dbGuildConfig.ID && p.UserID == userId.ToString())
-                .ToList();
+                .ToListAsync();
 
             if (permissions.Any())
             {
-                // Remove each permission individually to handle concurrency better
-                foreach (var permission in permissions)
-                {
-                    try
-                    {
-                        db.Permissions.Remove(permission);
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        // Permission might have been removed already by another thread
-                        // Reload the entity from database
-                        var entry = db.Entry(permission);
-                        if (entry.State != Microsoft.EntityFrameworkCore.EntityState.Detached)
-                        {
-                            entry.Reload();
-                            if (entry.Entity != null)
-                            {
-                                db.Permissions.Remove(entry.Entity);
-                            }
-                        }
-                    }
-                }
-                
-                try
-                {
-                    await db.SaveChangesAsync();
-                }
-                catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
-                {
-                    // Another thread already deleted these permissions, which is fine
-                    Log.Logger.Debug("Permissions for user {UserId} in guild {GuildId} were already removed by another process", userId, guildId);
-                }
+                db.Permissions.RemoveRange(permissions);
+                await db.SaveChangesAsync();
             }
+
+            Log.Logger.Debug("Removed {Count} permissions for user {UserId} in guild {GuildId}", permissions.Count, userId, guildId);
         }
         catch (Exception ex)
         {
@@ -423,114 +639,122 @@ public class QuotaBot
         }
     }
 
-private async Task CleanupOrphanedPermissions(SocketGuild guild, Guild dbGuild, Storage storage)
-{
-    try
+    private async Task CleanupOrphanedPermissions(SocketGuild guild, Guild dbGuild, Storage storage)
     {
-        using var scope = _services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<QuotaContext>();
-        
-        // Get all permissions for this guild
-        var guildPermissions = db.Permissions.Where(p => p.GuildConfigID == dbGuild.Config.ID).ToList();
-        
-        // Find permissions for users no longer in the guild
-        var orphanedPermissions = new List<Permission>();
-        
-        foreach (var permission in guildPermissions)
+        try
         {
-            if (!string.IsNullOrEmpty(permission.UserID))
+            using var scope = _services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<QuotaContext>();
+
+            // Get all permissions for this guild
+            var guildPermissions = await db.Permissions
+                .Where(p => p.GuildConfigID == dbGuild.Config.ID)
+                .ToListAsync();
+
+            // Find permissions for users no longer in the guild
+            var orphanedPermissions = new List<Permission>();
+
+            foreach (var permission in guildPermissions)
             {
-                if (ulong.TryParse(permission.UserID, out var userId))
+                if (!string.IsNullOrEmpty(permission.UserID))
                 {
-                    var user = guild.GetUser(userId);
-                    if (user == null) // User no longer in guild
+                    if (ulong.TryParse(permission.UserID, out var userId))
                     {
-                        orphanedPermissions.Add(permission);
+                        var user = guild.GetUser(userId);
+                        if (user == null) // User no longer in guild
+                        {
+                            orphanedPermissions.Add(permission);
+                        }
                     }
                 }
             }
-        }
 
-        if (orphanedPermissions.Any())
-        {
-            try
+            if (orphanedPermissions.Any())
             {
                 db.Permissions.RemoveRange(orphanedPermissions);
                 await db.SaveChangesAsync();
-                Log.Logger.Information("Removed {Count} orphaned permissions from guild {GuildName}", 
+                Log.Logger.Information("Removed {Count} orphaned permissions from guild {GuildName}",
                     orphanedPermissions.Count, guild.Name);
             }
-            catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
-            {
-                Log.Logger.Debug("Some orphaned permissions were already removed by another process in guild {GuildName}", guild.Name);
-            }
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Error(ex, "Failed to cleanup orphaned permissions for guild {GuildId}", guild.Id);
         }
     }
-    catch (Exception ex)
+
+    private async Task CleanupGuildUserPermissions(ulong guildId, Storage storage)
     {
-        Log.Logger.Error(ex, "Failed to cleanup orphaned permissions for guild {GuildId}", guild.Id);
-    }
-}
-
-private async Task CleanupGuildUserPermissions(ulong guildId, Storage storage)
-{
-    try
-    {
-        using var scope = _services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<QuotaContext>();
-        
-        var dbGuildConfig = db.GuildConfigs.FirstOrDefault(gc => gc.Guild.DiscordID == guildId.ToString());
-        if (dbGuildConfig == null) return;
-
-        // Remove all user permissions for this guild
-        var allPermissions = db.Permissions
-            .Where(p => p.GuildConfigID == dbGuildConfig.ID)
-            .ToList();
-
-        if (allPermissions.Any())
+        try
         {
-            try
+            using var scope = _services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<QuotaContext>();
+
+            var dbGuildConfig = await db.GuildConfigs
+                .FirstOrDefaultAsync(gc => gc.Guild.DiscordID == guildId.ToString());
+            if (dbGuildConfig == null) return;
+
+            // Remove all user permissions for this guild
+            var allPermissions = await db.Permissions
+                .Where(p => p.GuildConfigID == dbGuildConfig.ID)
+                .ToListAsync();
+
+            if (allPermissions.Any())
             {
                 db.Permissions.RemoveRange(allPermissions);
-                await db.SaveChangesAsync();
-                Log.Logger.Information("Cleaned up {Count} user permissions for guild {GuildId}", 
-                    allPermissions.Count, guildId);
-            }
-            catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
-            {
-                Log.Logger.Debug("Some permissions were already removed by another process for guild {GuildId}", guildId);
+                try
+                {
+                    await db.SaveChangesAsync();
+                    Log.Logger.Information("Cleaned up {Count} user permissions for guild {GuildId}",
+                        allPermissions.Count, guildId);
+                }
+                catch (DbUpdateConcurrencyException ex)
+                {
+                    Log.Logger.Warning(ex, "DbUpdateConcurrencyException: Some permissions for guild {GuildId} were already deleted (likely by cascade or concurrency)", guildId);
+                    // Not a fatal error, just log and continue
+                }
             }
         }
+        catch (Exception ex)
+        {
+            Log.Logger.Error(ex, "Failed to cleanup user permissions for guild {GuildId}", guildId);
+        }
     }
-    catch (Exception ex)
-    {
-        Log.Logger.Error(ex, "Failed to cleanup user permissions for guild {GuildId}", guildId);
-    }
-}
-    // API Helper Methods
 
     /// <summary>
     /// Gets all channels in a guild
     /// </summary>
     /// <param name="guildId">The Discord ID of the guild</param>
-    /// <returns>A collection of channels, or null if the guild is not found</returns>
-    public IEnumerable<IChannel>? GetGuildChannels(ulong guildId)
+    /// <returns>A collection of channels, or an empty collection if the guild is not found</returns>
+    public IEnumerable<IChannel> GetGuildChannels(ulong guildId)
     {
-        return _client.GetGuild(guildId)?.Channels;
+        return _client.GetGuild(guildId)?.Channels ?? Enumerable.Empty<IChannel>();
     }
 
     /// <summary>
     /// Gets all text channels in a guild
     /// </summary>
     /// <param name="guildId">The Discord ID of the guild</param>
-    /// <returns>A collection of text channels, or null if the guild is not found</returns>
-    public IEnumerable<ITextChannel>? GetGuildTextChannels(ulong guildId)
+    /// <returns>A collection of text channels, or an empty collection if the guild is not found</returns>
+    public IEnumerable<ITextChannel> GetGuildTextChannels(ulong guildId)
     {
-        return _client.GetGuild(guildId)?.TextChannels;
+        return _client.GetGuild(guildId)?.TextChannels ?? Enumerable.Empty<ITextChannel>();
     }
 
     public async Task StopAsync()
     {
+        _isReady = false;
         await _client.StopAsync();
     }
 }
+
+// Helper class for quote refresh functionality
+public class QuoteWithGuildInfo
+{
+    public Guid ID { get; set; }
+    public string MessageID { get; set; } = string.Empty;
+    public string GuildDiscordId { get; set; } = string.Empty;
+    public int Upvotes { get; set; }
+    public int Downvotes { get; set; }
+}
+
