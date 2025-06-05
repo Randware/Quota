@@ -1,9 +1,10 @@
 <script lang="ts">
 	import QuotaLogo from '$lib/assets/QuotaLogo.svelte';
+	import type { Session } from '$lib/server/types';
 	import LoginButton from './LoginButton.svelte';
 	import UserMenu from './UserMenu.svelte';
 
-	let { user } = $props<{ user: { name: string; picture: string } | null }>();
+	let { session } = $props<{ session: Session | undefined }>();
 </script>
 
 <header
@@ -20,8 +21,8 @@
 	</div>
 
 	<div class="ms-auto flex h-full items-center">
-		{#if user}
-			<UserMenu {user} />
+		{#if session}
+			<UserMenu {session} />
 		{:else}
 			<LoginButton />
 		{/if}

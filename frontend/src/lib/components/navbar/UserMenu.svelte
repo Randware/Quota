@@ -8,8 +8,9 @@
 	import { afterNavigate } from '$app/navigation';
 	import { createFloatingActions } from 'svelte-floating-ui';
 	import { offset } from 'svelte-floating-ui/dom';
+	import type { Session } from '$lib/server/types';
 
-	let { user } = $props<{ user: { name: string; picture: string } }>();
+	let { session } = $props<{ session: Session }>();
 
 	let open = $state(false);
 
@@ -38,14 +39,14 @@
 			? 'bg-highlight'
 			: 'hover:bg-highlight'} transition-colors duration-300"
 	>
-		<Avatar image={user.picture} text={user.name} />
+		<Avatar image={session.avatar} text={session.username} />
 
 		{#if open}
 			<div
 				class="text-light text-md mx-2 font-semibold sm:text-lg"
 				transition:slide={{ duration: 500, axis: 'x' }}
 			>
-				@{user.name}
+				@{session.username}
 			</div>
 		{/if}
 	</button>
