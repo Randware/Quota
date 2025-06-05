@@ -3,6 +3,8 @@ using Database;
 using Common.OAuth;
 using OAuth = Common.OAuth;
 using System.ComponentModel.DataAnnotations;
+using Common;
+using Microsoft.AspNetCore.Authorization;
 
 namespace API;
 
@@ -11,6 +13,7 @@ namespace API;
 /// </summary>
 [ApiController]
 [Route("auth")]
+[AllowAnonymous]
 public class AuthController : ControllerBase
 {
     private readonly Storage _storage;
@@ -32,6 +35,7 @@ public class AuthController : ControllerBase
     /// <param name="request">The login request containing the Discord OAuth2 code and redirect URI.</param>
     /// <returns>JWT and refresh token for the app.</returns>
     [HttpPost("login")]
+    [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var token = await OAuth.API.GetToken(request.Code, request.RedirectUri, _discordClient);
@@ -67,6 +71,7 @@ public class AuthController : ControllerBase
     /// <param name="request">The refresh request containing the app's refresh token.</param>
     /// <returns>New JWT and refresh token for the app.</returns>
     [HttpPost("refresh")]
+    [AllowAnonymous]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
     {
         var session = await _storage.GetSessionByRefreshTokenAsync(request.RefreshToken);
@@ -100,6 +105,7 @@ public class AuthController : ControllerBase
     /// <param name="request">The verify request containing the JWT.</param>
     /// <returns>Whether the JWT is valid and its claims.</returns>
     [HttpPost("verify")]
+    [AllowAnonymous]
     public IActionResult Verify([FromBody] VerifyRequest request)
     {
         try
@@ -121,6 +127,7 @@ public class AuthController : ControllerBase
     /// <param name="request">The revoke request containing the refresh token.</param>
     /// <returns>Success or not found.</returns>
     [HttpPost("revoke")]
+    [AllowAnonymous]
     public async Task<IActionResult> Revoke([FromBody] RevokeRequest request)
     {
         var result = await _storage.RevokeSessionByRefreshTokenAsync(request.RefreshToken);
@@ -135,6 +142,7 @@ public class AuthController : ControllerBase
     /// <param name="request">The revoke all request containing a valid refresh token.</param>
     /// <returns>The number of sessions revoked.</returns>
     [HttpPost("revoke-all")]
+    [AllowAnonymous]
     public async Task<IActionResult> RevokeAll([FromBody] RevokeAllRequest request)
     {
         var session = await _storage.GetSessionByRefreshTokenAsync(request.RefreshToken);
@@ -154,7 +162,11 @@ public class AuthController : ControllerBase
     {
         var allowedGuilds = new List<string>();
         var user = await _storage.GetUserByDiscordIdAsync(discordId);
-        if (user == null) return allowedGuilds;
+        if (user == null)
+        {
+            // Ensure user exists in DB before checking permissions
+            user = await _storage.CreateUserAsync(discordId);
+        }
         var guilds = await _storage.GetAllGuildsWithPermissionsAsync();
         foreach (var guild in guilds)
         {
@@ -231,4 +243,3 @@ public class RevokeAllRequest
     [Required]
     public string RefreshToken { get; set; }
 }
-

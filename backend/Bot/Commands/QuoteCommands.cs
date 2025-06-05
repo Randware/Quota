@@ -65,8 +65,8 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                         DiscordID = Context.Guild.Id.ToString(),
                         Config = new GuildConfig
                         {
-                            UpvoteEmoji = "👍",
-                            DownvoteEmoji = "👎",
+                            UpvoteEmojiConfig = new EmojiConfig { Type = "unicode", Name = "👍" },
+                            DownvoteEmojiConfig = new EmojiConfig { Type = "unicode", Name = "👎" },
                             AllowVoting = true,
                             LockAllowedChannels = false,
                             Comments = true
@@ -218,12 +218,12 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                             label: $"Upvote (0)",
                             customId: $"quote:upvote:{quote.ID}",
                             style: ButtonStyle.Secondary,
-                            emote: new Emoji(guild.Config.UpvoteEmoji))
+                            emote: GetDiscordEmote(guild.Config.UpvoteEmojiConfig))
                         .WithButton(
                             label: $"Downvote (0)",
                             customId: $"quote:downvote:{quote.ID}",
                             style: ButtonStyle.Secondary,
-                            emote: new Emoji(guild.Config.DownvoteEmoji));
+                            emote: GetDiscordEmote(guild.Config.DownvoteEmojiConfig));
                 }
 
                 // Send the message and get the message ID
@@ -353,12 +353,12 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                         label: $"Upvote ({quote.Upvotes})",
                         customId: $"quote:upvote:{quote.ID}",
                         style: userUpvoted ? ButtonStyle.Success : ButtonStyle.Secondary,
-                        emote: new Emoji(guild.Config.UpvoteEmoji))
+                        emote: GetDiscordEmote(guild.Config.UpvoteEmojiConfig))
                     .WithButton(
                         label: $"Downvote ({quote.Downvotes})",
                         customId: $"quote:downvote:{quote.ID}",
                         style: !userUpvoted ? ButtonStyle.Danger : ButtonStyle.Secondary,
-                        emote: new Emoji(guild.Config.DownvoteEmoji));
+                        emote: GetDiscordEmote(guild.Config.DownvoteEmojiConfig));
 
                 // Try to update the message
                 await TryUpdateMessage(components, quote, changed);
@@ -579,5 +579,14 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
     public IEnumerable<ITextChannel> GetGuildTextChannels(ulong guildId)
     {
         return Context.Client.GetGuild(guildId)?.TextChannels ?? Enumerable.Empty<ITextChannel>();
+    }
+
+    // Helper for Discord emote creation
+    private static IEmote GetDiscordEmote(EmojiConfig emoji)
+    {
+        if (emoji == null) return new Emoji("❓");
+        if (emoji.IsCustom && !string.IsNullOrEmpty(emoji.Id))
+            return Emote.Parse($"<:{emoji.Name}:{emoji.Id}>");
+        return new Emoji(emoji.Name);
     }
 }

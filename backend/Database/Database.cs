@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Database.Model;
 using Serilog.Context;
 using User = Database.Model.User;
+using System.Collections.Concurrent;
 
 namespace Database;
 
@@ -327,15 +328,41 @@ public class Storage
             await _context.Guilds.Include(g => g.Config).FirstOrDefaultAsync(g => g.ID == guildId));
     }
 
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> GuildCreateLocks = new();
+
     public async Task<Guild> CreateGuildAsync(Guild guild)
     {
-        return await LoggedOperation("creating guild", async () =>
+        var lockObj = GuildCreateLocks.GetOrAdd(guild.DiscordID, _ => new SemaphoreSlim(1, 1));
+        await lockObj.WaitAsync();
+        try
         {
-            guild.ID = Guid.NewGuid();
-            _context.Guilds.Add(guild);
-            await _context.SaveChangesAsync();
-            return guild;
-        });
+            // Prevent duplicate Guilds by DiscordID
+            var existing = await _context.Guilds.FirstOrDefaultAsync(g => g.DiscordID == guild.DiscordID);
+            if (existing != null)
+                return existing; // Return existing instead of throwing
+            try
+            {
+                return await LoggedOperation("creating guild", async () =>
+                {
+                    guild.ID = Guid.NewGuid();
+                    _context.Guilds.Add(guild);
+                    await _context.SaveChangesAsync();
+                    return guild;
+                });
+            }
+            catch (DbUpdateException)
+            {
+                // If UNIQUE constraint failed, fetch and return the existing guild
+                var already = await _context.Guilds.FirstOrDefaultAsync(g => g.DiscordID == guild.DiscordID);
+                if (already != null)
+                    return already;
+                throw; // If still not found, rethrow
+            }
+        }
+        finally
+        {
+            lockObj.Release();
+        }
     }
 
     public async Task<Guild?> UpdateGuildAsync(Guild guild)
