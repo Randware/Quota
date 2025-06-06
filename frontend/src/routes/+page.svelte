@@ -6,6 +6,7 @@
 	import { fly } from 'svelte/transition';
 	import { page } from '$app/state';
 	import { type Session } from '$lib/server/types';
+	import { onMount } from 'svelte';
 
 	let words: string[] = [
 		'reimagined',
@@ -20,9 +21,11 @@
 	let randomWord: string = $state(words[Math.floor(Math.random() * words.length)]);
 	let session: Session | undefined = $derived(page.data.session);
 
-	setInterval(() => {
-		randomWord = words[Math.floor(Math.random() * words.length)];
-	}, 5000);
+	onMount(() => {
+		setInterval(() => {
+			randomWord = words[Math.floor(Math.random() * words.length)];
+		}, 5000);
+	});
 </script>
 
 <div class="flex h-full w-full flex-col items-center overflow-y-auto p-8 md:p-12 lg:p-24">

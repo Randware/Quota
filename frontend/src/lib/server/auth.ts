@@ -9,7 +9,7 @@ const MOCK_SESSION: Session = { jwt: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzd
 const MOCK_GUILDS: Guild[] = [
   {
     id: "123456789012345678",
-    name: "Randware",
+    name: "Randware Testcord",
     icon: "https://cdn.discordapp.com/icons/1331222419469500499/64728f405bfc922dca201cfd01c92cca.png?quality=lossless",
     bot: true,
   },
