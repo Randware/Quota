@@ -224,6 +224,39 @@ public class Startup
                 {
                     var db = scope.ServiceProvider.GetRequiredService<QuotaContext>();
                     db.Database.EnsureCreated();
+
+                    // Auto-migration: add ChannelID column to Quotes if it doesn't exist
+                    try
+                    {
+                        var conn = db.Database.GetDbConnection();
+                        conn.Open();
+                        using var cmd = conn.CreateCommand();
+                        cmd.CommandText = "PRAGMA table_info(Quotes);";
+                        using var reader = cmd.ExecuteReader();
+                        bool hasChannelID = false;
+                        while (reader.Read())
+                        {
+                            if (reader.GetString(1) == "ChannelID")
+                            {
+                                hasChannelID = true;
+                                break;
+                            }
+                        }
+                        reader.Close();
+
+                        if (!hasChannelID)
+                        {
+                            using var alterCmd = conn.CreateCommand();
+                            alterCmd.CommandText = "ALTER TABLE Quotes ADD COLUMN ChannelID TEXT;";
+                            alterCmd.ExecuteNonQuery();
+                            Log.Logger.Information("Migration: Added ChannelID column to Quotes table");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Logger.Warning(ex, "Migration check for ChannelID column failed (may be fine on first run)");
+                    }
+
                     Log.Logger.Information("Database initialized successfully");
                 }
 

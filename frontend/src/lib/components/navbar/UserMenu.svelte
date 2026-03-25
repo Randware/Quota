@@ -26,7 +26,11 @@
 </script>
 
 {#if open}
-	<div class="fixed inset-0 z-40 h-screen w-screen" onclick={() => (open = false)}></div>
+	<button
+		class="fixed inset-0 z-40 h-screen w-screen cursor-default border-none bg-transparent"
+		aria-label="Close user menu"
+		onclick={() => (open = false)}
+	></button>
 {/if}
 
 <div class="z-50 h-full">
@@ -58,8 +62,8 @@
 			transition:slide={{ duration: 500, axis: 'y' }}
 		>
 			<UserMenuItem icon={LayoutGrid} text={'Dashboard'} href="/dashboard" />
-			<UserMenuItem icon={Settings} text={'Settings'} href="/" />
-			<UserMenuItem icon={LogOut} text={'Logout'} href="/" />
+			<UserMenuItem icon={Settings} text={'Settings'} href="/dashboard" />
+			<UserMenuItem icon={LogOut} text={'Logout'} href="/auth/logout" />
 		</div>
 	{/if}
 </div>

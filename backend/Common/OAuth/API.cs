@@ -349,14 +349,15 @@ public static class API
                     }
                     else if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                     {
-
-                        int retryAfterMs = JsonDocument.Parse(content).RootElement.GetProperty("retry_after").GetInt32();
+                        var root = JsonDocument.Parse(content).RootElement;
+                        double retryAfterSeconds = root.GetProperty("retry_after").GetDouble();
+                        int retryAfterMs = (int)Math.Ceiling(retryAfterSeconds * 1000);
+                        
                         Log.Logger.Warning(
                             "Rate limited while accessing {Endpoint}. Attempting {AttemptsLeft} more times. Waiting {RetryAfter}ms before retrying...",
                             endpoint, 3 - attempt, retryAfterMs);
                         await Task.Delay(retryAfterMs);
                         continue;
-
                     }
                     else
                     {

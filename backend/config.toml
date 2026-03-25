@@ -1,19 +1,19 @@
 [jwt]
-secret = "your_jwt_secret"
-issuer = "your_issuer"
-audience = "your_audience"
+secret = "L4pfpm+IMKnhYiYU/bwVCS5c6WON5TW49ykCvrPBIAWsEN2/bzcBNpofolibfDj5jIolnfWV8cqHxmbl+0W17A=="
+issuer = "Randware"
+audience = "quota"
 expiryMinutes = 5
 
 [oauth]
-id = "your_discord_client_id"
-secret = "your_discord_client_secret"
+id = "1331219516549501019"
+secret = "J5PSuhe0jA3IXRMOaX7oo9gFYTqUhXmZ"
 apiEndpoint = "https://discord.com/api/v10"
+
+[bot]
+token = "MTMzMTIxOTUxNjU0OTUwMTAxOQ.Gz9gV4.NOjGIRAPLHRI7bOHjw-9jbPBJX9EGeuy4LghbM"
 
 [openapi]
 enabled = true
 
 [server]
 port = 5000
-
-[bot]
-token = "your_bot_token"

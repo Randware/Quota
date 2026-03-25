@@ -8,7 +8,7 @@ This is the backend server for the Randware Quota application, providing authent
    ```bash
    dotnet run --project ConfigSetupTUI
    ```
-2. Copy the generated output to your `config.toml` file in the `Quota/backend` project directory. 
+2. Copy the generated output to your `config.toml` file in the `Quota/backend` project directory.
    - Alternatively, you can manually create and edit `config.toml` in the `Main` project directory.
 
 3. Start the server:
@@ -19,6 +19,7 @@ This is the backend server for the Randware Quota application, providing authent
 ## ⚙️ Configuration
 
 The server uses a `config.toml` file for all its settings. You can either:
+
 - Use our interactive setup tool (recommended)
 - Manually edit `config.toml`
 
@@ -59,6 +60,7 @@ The Discord bot requires a token to function. To get your bot token:
 ⚠️ **Important**: Keep your bot token secret! Never commit it to version control.
 
 Required Bot Permissions:
+
 - View Channels
 - Send Messages
 - Send Messages in Threads
@@ -73,11 +75,13 @@ You can use the `/bot/invite` endpoint to get an invite link with all required p
 ## 📖 API Documentation
 
 When OpenAPI is enabled (`[openapi] enabled = true`), you can access the interactive API documentation at:
+
 ```
 http://localhost:{port}/swagger
 ```
 
 The Swagger UI provides:
+
 - Detailed endpoint documentation
 - Request/response schemas
 - Interactive testing interface
@@ -89,16 +93,18 @@ The Swagger UI provides:
   - JWT secret (used for signing tokens)
   - Discord OAuth credentials
   - Bot token
-- Never share your actual `config.toml` with others 
+- Never share your actual `config.toml` with others
 
 ## 🛠️ Development
 
 ### Prerequisites
+
 - .NET 9.0 or higher
 - A Discord application (for OAuth)
 - A Discord bot token
 
 ### Local Development
+
 1. Clone the repository
 2. Run the config setup tool
 3. Start the server

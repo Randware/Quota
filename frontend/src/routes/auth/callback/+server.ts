@@ -1,14 +1,23 @@
 import { dev } from "$app/environment";
 import { DISCORD_REDIRECT_URI } from "$env/static/private";
-import { createSession } from "$lib/server/auth";
+import { createSession, refreshSession } from "$lib/server/auth";
 import type { Session } from "$lib/server/types";
 import { redirect, type RequestHandler } from "@sveltejs/kit";
 
-export const GET: RequestHandler = async ({ url, cookies }) => {
+export const GET: RequestHandler = async ({ url, cookies, locals }) => {
   const guildID = url.searchParams.get('guild_id');
 
   // If we have a guild ID, this is a bot invite callback
   if (guildID) {
+    if (locals.session) {
+      const newSession = await refreshSession(locals.session, true);
+      cookies.set('session', JSON.stringify(newSession), {
+        path: '/',
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: !dev,
+      });
+    }
     throw redirect(302, `/dashboard/${guildID}`);
   }
 
