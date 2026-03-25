@@ -4,6 +4,7 @@ public class Quote
 {
     public Guid ID { get; set; }
     public string MessageID { get; set; }
+    public string ChannelID { get; set; }
     public string Content { get; set; }
     public string MediaUrls { get; set; } = ""; 
     public int Upvotes { get; set; }

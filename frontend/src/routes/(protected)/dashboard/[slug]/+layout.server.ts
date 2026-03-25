@@ -4,7 +4,7 @@ import type { Guild, Settings, Stats } from '$lib/server/types';
 import { getGuildStats } from '$lib/server/stats';
 import { getGuildSettings } from '$lib/server/settings';
 
-export const load: LayoutServerLoad = async ({ params, parent }) => {
+export const load: LayoutServerLoad = async ({ params, parent, locals }) => {
   const guildId: string = params.slug;
   const { userGuilds }: { userGuilds: Promise<Guild[]> } = await parent();
 
@@ -14,9 +14,11 @@ export const load: LayoutServerLoad = async ({ params, parent }) => {
     throw redirect(303, '/dashboard');
   }
 
-  const stats: Promise<Stats> = getGuildStats(guild);
+  const session = locals.session!;
 
-  const settings: Promise<Settings> = getGuildSettings(guild);
+  const stats: Promise<Stats> = getGuildStats(guild, session);
+
+  const settings: Promise<Settings> = getGuildSettings(guild, session);
 
   return { guild, stats, settings };
 };

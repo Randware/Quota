@@ -43,6 +43,45 @@ public class QuotaBot
 
         // Add message received handler for locked channels
         _client.MessageReceived += HandleMessageReceivedAsync;
+
+        // Auto-delete quotes from DB when their Discord message is deleted
+        _client.MessageDeleted += HandleMessageDeletedAsync;
+    }
+
+    private async Task HandleMessageDeletedAsync(Cacheable<IMessage, ulong> cachedMessage, Cacheable<IMessageChannel, ulong> cachedChannel)
+    {
+        try
+        {
+            var messageId = cachedMessage.Id.ToString();
+
+            using var scope = _services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<QuotaContext>();
+
+            var quote = await db.Quotes.FirstOrDefaultAsync(q => q.MessageID == messageId);
+            if (quote == null) return; // Not a quote message
+
+            // Delete related records
+            var relatedQuotees = db.Set<QuoteQuotee>().Where(qq => qq.QuoteID == quote.ID);
+            db.Set<QuoteQuotee>().RemoveRange(relatedQuotees);
+
+            var relatedVotes = db.Set<QuoteVote>().Where(qv => qv.QuoteID == quote.ID);
+            db.Set<QuoteVote>().RemoveRange(relatedVotes);
+
+            db.Quotes.Remove(quote);
+            await db.SaveChangesAsync();
+
+            using (LogContext.PushProperty("SourceContext", "Discord.Bot"))
+            {
+                Log.Logger.Information("Auto-deleted quote {QuoteId} from DB because Discord message {MessageId} was deleted", quote.ID, messageId);
+            }
+        }
+        catch (Exception ex)
+        {
+            using (LogContext.PushProperty("SourceContext", "Discord.Bot"))
+            {
+                Log.Logger.Warning(ex, "Failed to auto-delete quote for deleted message {MessageId}", cachedMessage.Id);
+            }
+        }
     }
 
     private Task LogDiscordMessage(LogMessage msg)
@@ -172,6 +211,34 @@ public class QuotaBot
                         }
                     });
                 }
+                
+                // Cleanup guilds the bot was kicked from while offline
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        using var scope = _services.CreateScope();
+                        var storage = scope.ServiceProvider.GetRequiredService<Storage>();
+                        var db = scope.ServiceProvider.GetRequiredService<Database.Model.QuotaContext>();
+                        var dbGuilds = await db.Guilds.ToListAsync();
+                        
+                        foreach (var dbGuild in dbGuilds)
+                        {
+                            if (ulong.TryParse(dbGuild.DiscordID, out var guildId))
+                            {
+                                if (_client.GetGuild(guildId) == null)
+                                {
+                                    Log.Logger.Information("Bot was removed from guild {GuildId} while offline. Cleaning up permissions.", guildId);
+                                    await CleanupGuildUserPermissions(guildId, storage);
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Logger.Error(ex, "Failed to cleanup offline-removed guilds during startup");
+                    }
+                });
                 
                 // Refresh recent quote buttons (optional feature)
                 _ = Task.Run(RefreshRecentQuoteButtons);
@@ -733,13 +800,15 @@ public class QuotaBot
             using var scope = _services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<QuotaContext>();
 
-            var dbGuildConfig = await db.GuildConfigs
-                .FirstOrDefaultAsync(gc => gc.Guild.DiscordID == guildId.ToString());
-            if (dbGuildConfig == null) return;
+            var dbGuild = await db.Guilds
+                .Include(g => g.Config)
+                .FirstOrDefaultAsync(g => g.DiscordID == guildId.ToString());
+                
+            if (dbGuild == null || dbGuild.Config == null) return;
 
             // Remove all user permissions for this guild
             var allPermissions = await db.Permissions
-                .Where(p => p.GuildConfigID == dbGuildConfig.ID)
+                .Where(p => p.GuildConfigID == dbGuild.Config.ID)
                 .ToListAsync();
 
             if (allPermissions.Any())

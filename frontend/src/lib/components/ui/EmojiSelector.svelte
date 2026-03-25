@@ -6,12 +6,23 @@
 	import { createFloatingActions } from 'svelte-floating-ui';
 	import { offset, flip, shift } from 'svelte-floating-ui/dom';
 
-	let { defaultEmoji, custom = [] } = $props<{
-		defaultEmoji: TextEmoji | ImageEmoji;
-		custom: CustomEmojiCollection[];
+	let {
+		defaultEmoji,
+		custom = [],
+		selectedEmoji = $bindable()
+	} = $props<{
+		defaultEmoji?: TextEmoji | ImageEmoji;
+		custom?: CustomEmojiCollection[];
+		selectedEmoji?: TextEmoji | ImageEmoji;
 	}>();
 
-	let selectedEmoji: TextEmoji | ImageEmoji = $state(defaultEmoji);
+	// Initialize selectedEmoji with defaultEmoji if it's not provided
+	$effect(() => {
+		if (selectedEmoji === undefined && defaultEmoji !== undefined) {
+			selectedEmoji = defaultEmoji;
+		}
+	});
+
 	let showSelector: boolean = $state(false);
 
 	const [referenceAction, floatingAction] = createFloatingActions({
@@ -39,14 +50,16 @@
 	onclick={() => (showSelector = !showSelector)}
 >
 	<div class="h-full w-full">
-		{#if 'native' in selectedEmoji}
-			{#key selectedEmoji}
-				<div use:emojify={{}}>
-					{selectedEmoji.native}
-				</div>
-			{/key}
-		{:else}
-			<img src={selectedEmoji.src} alt="" />
+		{#if selectedEmoji}
+			{#if 'native' in selectedEmoji}
+				{#key selectedEmoji}
+					<div use:emojify={{}}>
+						{selectedEmoji.native}
+					</div>
+				{/key}
+			{:else if 'src' in selectedEmoji}
+				<img src={selectedEmoji.src} alt="" />
+			{/if}
 		{/if}
 	</div>
 </button>

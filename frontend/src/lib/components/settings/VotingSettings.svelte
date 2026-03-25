@@ -23,13 +23,19 @@
 				<div class="flex items-center">
 					<div class="text-light flex-1 font-semibold">Upvote Emoji</div>
 
-					<EmojiSelector defaultEmoji={{ id: 'test', name: 'Test Name', native: '👍' }} />
+					<EmojiSelector
+						defaultEmoji={settings.upvoteEmoji}
+						bind:selectedEmoji={settings.upvoteEmoji}
+					/>
 				</div>
 
 				<div class="flex items-center">
 					<div class="text-light flex-1 font-semibold">Downvote Emoji</div>
 
-					<EmojiSelector defaultEmoji={{ id: 'test', name: 'Test Name', native: '👎' }} />
+					<EmojiSelector
+						defaultEmoji={settings.downvoteEmoji}
+						bind:selectedEmoji={settings.downvoteEmoji}
+					/>
 				</div>
 			</div>
 		</SettingsItemSection>

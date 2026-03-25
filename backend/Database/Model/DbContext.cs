@@ -34,6 +34,7 @@ public class QuotaContext : DbContext
         {
             b.HasKey(q => q.ID);
             b.Property(q => q.MessageID).IsRequired();
+            b.Property(q => q.ChannelID).IsRequired(false);
             b.Property(q => q.Content).IsRequired(false);
             b.Property(q => q.MediaUrls).IsRequired(false);
             b.Property(q => q.Upvotes).IsRequired();

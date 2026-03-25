@@ -241,8 +241,9 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                     components: components.Build()
                 );
 
-                // Now set the MessageID and save the quote
+                // Now set the MessageID and ChannelID, then save the quote
                 quote.MessageID = sentMessage.Id.ToString();
+                quote.ChannelID = Context.Channel.Id.ToString();
                 quote = await _storage.CreateQuoteAsync(quote);
 
                 // If it's a video, send the link as a plain message so Discord previews it

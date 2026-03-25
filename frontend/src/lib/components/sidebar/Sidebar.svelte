@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { Settings, type Icon, ChartNoAxesColumn, LayoutGrid } from 'lucide-svelte';
+	import {
+		Settings,
+		type Icon,
+		ChartNoAxesColumn,
+		LayoutGrid,
+		MessageSquareText
+	} from 'lucide-svelte';
 	import SidebarItem from './SidebarItem.svelte';
 	import { page } from '$app/state';
 	import type { Guild } from '$lib/server/types';
@@ -14,6 +20,7 @@
 
 	const pages: Page[] = [
 		{ name: 'Overview', icon: LayoutGrid, path: `/dashboard/${guild.id}/overview` },
+		{ name: 'Quotes', icon: MessageSquareText, path: `/dashboard/${guild.id}/quotes` },
 		{ name: 'Settings', icon: Settings, path: `/dashboard/${guild.id}/settings` },
 		{ name: 'Stats', icon: ChartNoAxesColumn, path: `/dashboard/${guild.id}/stats` }
 	];
