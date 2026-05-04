@@ -1,5 +1,5 @@
 {
-  description = "A .NET 9 development environment";
+  description = "A .NET 10 development environment";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -11,7 +11,7 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         dotnetPkg = (with pkgs.dotnetCorePackages; combinePackages [
-          sdk_9_0
+          sdk_10_0
         ]);
         deps = [
           pkgs.zlib
