@@ -99,6 +99,27 @@ pnpm dev
 
 The backend will create a local SQLite database at `backend/database.db` on first run.
 
+## Docker (frontend + backend + nginx)
+
+This repo ships a `docker-compose.yml` to run both services behind an Nginx reverse proxy.
+
+Create `backend/config.toml`, then copy the env file and fill it in:
+
+```bash
+cp .env.example .env
+```
+
+Run:
+
+```bash
+docker compose up --build
+```
+
+Nginx listens on `http://localhost:8080` and proxies:
+
+- `/` → frontend
+- `/api/` → backend
+
 ## Commands
 
 ### Backend (.NET)

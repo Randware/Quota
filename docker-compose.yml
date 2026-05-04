@@ -3,8 +3,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - "5000:5000"
     volumes:
       - ./backend/config.toml:/app/config.toml:ro
       - backend-data:/data
@@ -22,14 +20,22 @@ services:
         DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
         DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}
         BACKEND_HOST: ${BACKEND_HOST}
-    ports:
-      - "3000:3000"
     environment:
       - NODE_ENV=production
     env_file:
       - ./.env
     depends_on:
       - backend
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+      - frontend
 
 volumes:
   backend-data:
