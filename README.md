@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="frontend/src/lib/assets/logo.png" alt="Quota logo" width="120" />
+  <img src="frontend/src/lib/assets/Quota.png" alt="Quota logo" width="120" />
   <h1>Randware Quota</h1>
   <p>Capture the moments people quote for years, then surface them with a clean, fast dashboard.</p>
 </div>
