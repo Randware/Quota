@@ -1,30 +1,20 @@
-import { dev } from '$app/environment';
-import type { Guild, Stats } from '$lib/server/types';
-import { createCache } from 'cache-manager';
+import type { Guild, Session, Stats } from '$lib/server/types';
+import { BACKEND_HOST } from '$env/static/private';
 
-const CACHE_TTL = 30_000;
+export async function getGuildStats(guild: Guild, session: Session): Promise<Stats> {
+  try {
+    const res = await fetch(`${BACKEND_HOST}/server/${guild.id}/stats`, {
+      headers: {
+        "Authorization": `Bearer ${session.jwt}`
+      }
+    });
 
-const cache = createCache({ ttl: CACHE_TTL, });
+    if (!res.ok) {
+      return { totalQuotes: 0, totalUpvotes: 0, totalDownvotes: 0, quotesByMonth: [], topQuotees: [], topQuotes: [] };
+    }
 
-const MOCK_STATS: Stats = { totalQuotes: 50 };
-
-async function fetchStatsFromBackend(guild: Guild): Promise<Stats> {
-  if (dev) {
-    return MOCK_STATS
+    return await res.json();
+  } catch {
+    return { totalQuotes: 0, totalUpvotes: 0, totalDownvotes: 0, quotesByMonth: [], topQuotees: [], topQuotes: [] };
   }
-
-  //  TODO: Query backend here
-  const stats: Stats = { totalQuotes: 0 };
-
-  return stats;
-}
-
-// Function to get stats from cache or fetch and update the cache
-export async function getGuildStats(guild: Guild): Promise<Stats> {
-  const cacheKey = `guild-stats:${guild.id}`;
-
-  return cache.wrap(cacheKey, async () => {
-    const stats = await fetchStatsFromBackend(guild);
-    return stats;
-  }, { ttl: CACHE_TTL });
 }

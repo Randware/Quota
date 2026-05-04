@@ -1,14 +1,38 @@
 export interface Settings {
   allowedChannels: Channel[];
   lockAllowedChannels: boolean;
-  upvoteEmoji: string;
-  downvoteEmoji: string;
+  upvoteEmoji: TextEmoji | ImageEmoji;
+  downvoteEmoji: TextEmoji | ImageEmoji;
   allowVoting: boolean;
   comments: boolean;
 }
 
 export interface Stats {
   totalQuotes: number;
+  totalUpvotes: number;
+  totalDownvotes: number;
+  quotesByMonth: MonthlyQuotes[];
+  topQuotees: TopQuotee[];
+  topQuotes: TopQuote[];
+}
+
+export interface MonthlyQuotes {
+  year: number;
+  month: number;
+  count: number;
+}
+
+export interface TopQuotee {
+  name: string;
+  count: number;
+}
+
+export interface TopQuote {
+  content: string;
+  upvotes: number;
+  downvotes: number;
+  score: number;
+  createdAt: string | null;
 }
 
 export interface Session {
