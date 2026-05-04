@@ -10,7 +10,7 @@ ENV DISCORD_REDIRECT_URI=${DISCORD_REDIRECT_URI}
 ENV BACKEND_HOST=${BACKEND_HOST}
 
 COPY package.json pnpm-lock.yaml ./
-RUN corepack enable && pnpm install --frozen-lockfile
+RUN corepack enable && corepack prepare pnpm@9.12.1 --activate && pnpm install --frozen-lockfile
 
 COPY . .
 RUN pnpm build
