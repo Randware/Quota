@@ -59,11 +59,10 @@ public class Program
             .ConfigureWebHostDefaults(webBuilder =>
             {
                 webBuilder.UseStartup<Startup>();
-                webBuilder.UseUrls($"http://localhost:{port}");
+                webBuilder.UseUrls($"http://0.0.0.0:{port}");
             })
             .UseSerilog(); // Use Serilog as the logging provider
     }
 }
-
 
 

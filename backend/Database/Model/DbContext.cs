@@ -23,7 +23,7 @@ public class QuotaContext : DbContext
     /// Create a new DbContext with default options 
     /// </summary>
     public QuotaContext() : base(new DbContextOptionsBuilder<QuotaContext>()
-            .UseSqlite("Data Source=database.db")
+            .UseSqlite(DatabaseConfig.ConnectionString)
             .Options)
     { }
 

@@ -1,0 +1,35 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend/config.toml:/app/config.toml:ro
+      - backend-data:/data
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - QUOTA_DB_PATH=/data/database.db
+    working_dir: /app
+    command: ["dotnet", "Main.dll"]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+        DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}
+        BACKEND_HOST: ${BACKEND_HOST}
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - ./.env
+    depends_on:
+      - backend
+
+volumes:
+  backend-data:

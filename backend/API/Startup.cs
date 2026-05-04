@@ -95,7 +95,7 @@ public class Startup
                 // Register QuotaContext for DI
                 services.AddDbContext<QuotaContext>(options =>
                 {
-                    options.UseSqlite("Data Source=database.db");
+                    options.UseSqlite(DatabaseConfig.ConnectionString);
                     options.UseLoggerFactory(
                         LoggerFactory.Create(builder =>
                         {
