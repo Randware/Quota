@@ -1,6 +1,17 @@
-# Randware Quota
+<div align="center">
+  <img src="frontend/src/lib/assets/logo.png" alt="Quota logo" width="120" />
+  <h1>Randware Quota</h1>
+  <p>Capture the moments people quote for years, then surface them with a clean, fast dashboard.</p>
+</div>
 
-Quota is a Discord quote bot with a web dashboard for managing, browsing, and celebrating the best moments in your server. This repo ships both the .NET backend (API + bot) and a SvelteKit frontend.
+Quota is a Discord quote bot with a web dashboard for managing, browsing, and celebrating the best moments in your server. Save quotes with slash commands, let your community vote, and track the greatest hits without leaving Discord.
+
+## Why Quota
+
+- Designed for real communities: collect quotes fast and keep them organized.
+- Built-in voting and stats so the best moments rise to the top.
+- A polished dashboard for search, permissions, and server-level control.
+- Simple setup: generate config, run the server, invite the bot.
 
 ## Repository layout
 
