@@ -54,21 +54,32 @@ export async function getUserGuilds(session: Session): Promise<Guild[]> {
 
   const discordGuilds: { id: string; name: string; icon: string | null; permissions: number }[] = await guildsRes.json();
 
-  // Get the allowed_guilds claim from JWT to determine which guilds have the bot
-  const decoded = jwtDecode<{ allowed_guilds?: string }>(session.jwt);
-  const allowedGuildIds = decoded.allowed_guilds?.split(',') ?? [];
-
   // Show all guilds where user has MANAGE_GUILD (0x20) or ADMINISTRATOR (0x8)
   const MANAGE_GUILD = 0x20;
   const ADMINISTRATOR = 0x8;
 
-  const guilds: Guild[] = discordGuilds
-    .filter((g) => (g.permissions & MANAGE_GUILD) !== 0 || (g.permissions & ADMINISTRATOR) !== 0)
+  const userAdminGuilds = discordGuilds.filter(
+    (g) => (g.permissions & MANAGE_GUILD) !== 0 || (g.permissions & ADMINISTRATOR) !== 0
+  );
+
+  // Check which of these guilds the bot is in
+  const checkRes = await fetch(`${BACKEND_HOST}/user/${userID}/check-guilds`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${session.jwt}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(userAdminGuilds.map((g) => g.id))
+  });
+
+  const botGuildIds: string[] = checkRes.ok ? await checkRes.json() : [];
+
+  const guilds: Guild[] = userAdminGuilds
     .map((g) => ({
       id: g.id,
       name: g.name,
       icon: g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=256` : "",
-      bot: allowedGuildIds.includes(g.id),
+      bot: botGuildIds.includes(g.id),
     }))
     .sort((a, b) => {
       // Bot guilds first, then alphabetical

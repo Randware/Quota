@@ -138,5 +138,30 @@ namespace API.Controllers
             var doc = JsonDocument.Parse(json);
             return Ok(doc.RootElement);
         }
+
+        /// <summary>
+        /// Checks a list of guild IDs to see which ones the bot is in.
+        /// </summary>
+        /// <param name="id">The Discord user ID</param>
+        /// <param name="guildIds">Array of Discord guild IDs</param>
+        /// <returns>An array of guild IDs the bot is in</returns>
+        [HttpPost("check-guilds")]
+        [Authorize]
+        public async Task<IActionResult> CheckGuilds([FromRoute] string id, [FromBody] string[] guildIds)
+        {
+            var jwtUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (jwtUserId != id)
+            {
+                return Unauthorized("User ID does not match token");
+            }
+
+            var botGuilds = await _db.Guilds
+                .Where(g => guildIds.Contains(g.DiscordID))
+                .Select(g => g.DiscordID)
+                .ToListAsync();
+
+            return Ok(botGuilds);
+        }
     }
 }
