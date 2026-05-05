@@ -156,10 +156,23 @@ namespace API.Controllers
                 return Unauthorized("User ID does not match token");
             }
 
-            var botGuilds = await _db.Guilds
-                .Where(g => guildIds.Contains(g.DiscordID))
-                .Select(g => g.DiscordID)
-                .ToListAsync();
+            var client = Bot.QuotaBot.ClientInstance;
+            List<string> botGuilds;
+
+            if (client != null)
+            {
+                var clientGuildIds = client.Guilds.Select(g => g.Id.ToString()).ToHashSet();
+                botGuilds = guildIds
+                    .Where(gid => clientGuildIds.Contains(gid))
+                    .ToList();
+            }
+            else
+            {
+                botGuilds = await _db.Guilds
+                    .Where(g => guildIds.Contains(g.DiscordID))
+                    .Select(g => g.DiscordID)
+                    .ToListAsync();
+            }
 
             return Ok(botGuilds);
         }

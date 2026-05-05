@@ -12,6 +12,8 @@
 	let guild: Guild = $derived(page.data.guild);
 	let errorMessage = $state('');
 	let isRemoving = $state(false);
+	let isConfirming = $state(false);
+	let formEl: HTMLFormElement;
 
 	const handleRemove: SubmitFunction = () => {
 		isRemoving = true;
@@ -19,7 +21,7 @@
 			isRemoving = false;
 			if (result.type === 'success' && result.data?.success) {
 				errorMessage = '';
-				await invalidateAll();
+				await goto('/dashboard');
 				return;
 			}
 			// result.type === 'failure' when the action called fail()
@@ -27,6 +29,19 @@
 			errorMessage = data?.error ?? 'Failed to remove bot from server.';
 			await invalidateAll();
 		};
+	};
+
+	const openConfirm = () => {
+		isConfirming = true;
+	};
+
+	const cancelConfirm = () => {
+		isConfirming = false;
+	};
+
+	const confirmRemove = () => {
+		isConfirming = false;
+		formEl?.requestSubmit();
 	};
 </script>
 
@@ -52,8 +67,8 @@
 			<div class="text-light px-4 py-2 font-semibold">Switch</div>
 		</ButtonPrimary>
 
-		<form method="POST" action="?/removeBot" use:enhance={handleRemove}>
-			<ButtonDark onclick={() => undefined} disabled={isRemoving}>
+		<form bind:this={formEl} method="POST" action="?/removeBot" use:enhance={handleRemove}>
+			<ButtonDark onclick={openConfirm} disabled={isRemoving} type="button">
 				<div class="text-light px-4 py-2 font-semibold">
 					{isRemoving ? 'Removing…' : 'Remove Quota'}
 				</div>
@@ -61,3 +76,24 @@
 		</form>
 	</div>
 </div>
+
+{#if isConfirming}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+		<div class="bg-dark ring-highlight w-full max-w-sm rounded-xl p-6 ring-2">
+			<div class="text-light text-lg font-semibold">Remove Quota from {guild.name}?</div>
+			<div class="text-light/70 mt-2 text-sm">
+				The bot will leave the server and the dashboard will update automatically.
+			</div>
+			<div class="mt-6 flex justify-end gap-3">
+				<ButtonDark onclick={cancelConfirm} disabled={isRemoving} type="button">
+					<div class="text-light px-4 py-2 font-semibold">Cancel</div>
+				</ButtonDark>
+				<ButtonPrimary onclick={confirmRemove} disabled={isRemoving} type="button">
+					<div class="text-light px-4 py-2 font-semibold">
+						{isRemoving ? 'Removing…' : 'Remove'}
+					</div>
+				</ButtonPrimary>
+			</div>
+		</div>
+	</div>
+{/if}
