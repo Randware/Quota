@@ -705,6 +705,66 @@ namespace API.Controllers
 
             return Ok(new { success = true, discordDeleted });
         }
+
+        /// <summary>
+        /// Removes the bot from a guild if the requesting user still has permission.
+        /// </summary>
+        [HttpDelete("bot")]
+        [Authorize]
+        public async Task<IActionResult> RemoveBotFromGuild([FromRoute] string id)
+        {
+            var jwtUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (string.IsNullOrEmpty(jwtUserId))
+                return Unauthorized("Missing user id in token");
+
+            // No scope check — just need a valid token to call the guilds endpoint
+            var token = await _discordTokenService.GetValidTokenForUserAsync(jwtUserId);
+            if (token == null)
+                return StatusCode(403, new { error = "No valid Discord token found for user.", code = "token_missing" });
+
+            var guildsResponse = await Common.OAuth.API.FetchUserGuilds(token);
+            if (guildsResponse == null)
+                return StatusCode(502, new { error = "Failed to fetch servers from Discord API.", code = "discord_unavailable" });
+            if (!guildsResponse.IsSuccessStatusCode)
+                return StatusCode((int)guildsResponse.StatusCode, new { error = "Failed to fetch servers from Discord API.", code = "discord_error" });
+
+            var json = await guildsResponse.Content.ReadAsStringAsync();
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+
+            var guildElement = doc.RootElement.EnumerateArray().FirstOrDefault(g => g.GetProperty("id").GetString() == id);
+            if (guildElement.ValueKind == System.Text.Json.JsonValueKind.Undefined)
+                return StatusCode(403, new { error = "You are no longer in this server.", code = "no_guild" });
+
+            const long ManageGuild = 0x20;
+            const long Administrator = 0x8;
+            // Discord returns permissions as a string in the guilds endpoint
+            var permStr = guildElement.GetProperty("permissions").GetString() ?? "0";
+            var permissions = long.TryParse(permStr, out var p) ? p : 0L;
+            var hasManage = (permissions & ManageGuild) != 0 || (permissions & Administrator) != 0;
+
+            if (!hasManage)
+            {
+                return StatusCode(403, new
+                {
+                    error = "You no longer have permission to manage this server.",
+                    code = "no_permission"
+                });
+            }
+
+            if (!ulong.TryParse(id, out var guildId))
+                return BadRequest(new { error = "Invalid guild id", code = "invalid_guild" });
+
+            var client = Bot.QuotaBot.ClientInstance;
+            if (client == null)
+                return StatusCode(503, new { error = "Bot is not available.", code = "bot_unavailable" });
+
+            var guild = client.GetGuild(guildId);
+            if (guild == null)
+                return Ok(new { success = true, botLeft = false, reason = "bot_not_in_guild" });
+
+            await guild.LeaveAsync();
+            return Ok(new { success = true, botLeft = true });
+        }
     }
 }
-

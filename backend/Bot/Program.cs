@@ -20,7 +20,7 @@ public class Program
             
         // Add DbContext
         services.AddDbContext<QuotaContext>(options =>
-            options.UseSqlite("Data Source=database.db"));
+            options.UseSqlite(DatabaseConfig.ConnectionString));
             
         // Add Storage
         services.AddScoped<Storage>();

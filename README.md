@@ -34,7 +34,50 @@ From `backend/`, run the interactive setup to generate a `config.toml`:
 dotnet run --project ConfigSetupTUI
 ```
 
-Copy the output into `backend/config.toml`.
+This prints a ready-to-use `config.toml`. Save it as `backend/config.toml`.
+
+Notes:
+
+- `oauth.id` and `oauth.secret` are your Discord Application Client ID/Secret.
+- `bot.token` is your Discord bot token.
+- `jwt.secret` can be any long random string.
+- `server.port` defaults to `5000` (update if you want a different port).
+
+#### What the setup wizard does
+
+The setup wizard asks a few questions and prints a complete `config.toml` you can paste directly into `backend/config.toml`.
+
+Example (redacted):
+
+```toml
+[jwt]
+secret = "<generated secret>"
+issuer = "Randware"
+audience = "Quota"
+expiryMinutes = 5
+
+[oauth]
+id = "<discord client id>"
+secret = "<discord client secret>"
+apiEndpoint = "https://discord.com/api/v10"
+
+[bot]
+token = "<discord bot token>"
+
+[openapi]
+enabled = false
+
+[server]
+port = 5000
+```
+
+Discord redirect URI:
+
+- You must add your callback URL in the Discord Developer Portal → OAuth2 → Redirects.
+- For local nginx: `http://localhost:8080/auth/callback`
+- For production: `https://your-domain.com/auth/callback`
+
+This must match `DISCORD_REDIRECT_URI` exactly (no trailing slash).
 
 Minimal config shape:
 
@@ -103,7 +146,7 @@ The backend will create a local SQLite database at `backend/database.db` on firs
 
 This repo ships a `docker-compose.yml` to run both services behind an Nginx reverse proxy.
 
-Create `backend/config.toml`, then copy the env file and fill it in:
+Create `backend/config.toml` via the setup wizard, then copy the env file and fill it in:
 
 ```bash
 cp .env.example .env
