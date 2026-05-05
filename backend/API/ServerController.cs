@@ -709,6 +709,9 @@ namespace API.Controllers
         /// <summary>
         /// Deletes all quotes for this guild from both Discord and the database.
         /// Also removes associated Discord threads.
+        /// DB records are deleted FIRST to prevent a race with the bot's
+        /// MessageDeleted handler (which auto-deletes quotes from the DB when
+        /// their Discord message disappears, causing DbUpdateConcurrencyException).
         /// </summary>
         [HttpDelete("quotes")]
         [Authorize]
@@ -733,8 +736,7 @@ namespace API.Controllers
 
             var quoteIds = quotes.Select(q => q.ID).ToList();
 
-            // Eagerly materialize related records BEFORE any Discord work
-            // (DiscoverChannelForMessage mutates the DbContext, so lazy IQueryable would break)
+            // Eagerly load related records
             var relatedQuotees = await _db.Set<QuoteQuotee>()
                 .Where(qq => quoteIds.Contains(qq.QuoteID))
                 .ToListAsync();
@@ -742,27 +744,37 @@ namespace API.Controllers
                 .Where(qv => quoteIds.Contains(qv.QuoteID))
                 .ToListAsync();
 
+            // Collect Discord info we'll need BEFORE removing from DB
+            var discordMessages = quotes
+                .Where(q => !string.IsNullOrEmpty(q.MessageID))
+                .Select(q => new { q.MessageID, q.ChannelID })
+                .ToList();
+
+            // ── Step 1: Delete all DB records FIRST ──
+            // This prevents the race with the bot's MessageDeleted handler,
+            // which would otherwise auto-delete the same rows concurrently.
+            _db.Set<QuoteQuotee>().RemoveRange(relatedQuotees);
+            _db.Set<QuoteVote>().RemoveRange(relatedVotes);
+            _db.Quotes.RemoveRange(quotes);
+            await _db.SaveChangesAsync();
+
+            // ── Step 2: Clean up Discord messages + threads (best-effort) ──
             var deletedInDiscord = 0;
             var attemptedInDiscord = 0;
             var deletedThreads = 0;
 
-            // Build a shared HttpClient for all Discord API calls
             using var httpClient = new HttpClient();
             httpClient.DefaultRequestHeaders.Authorization =
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bot", _discordClient.BotToken);
 
-            foreach (var quote in quotes)
+            foreach (var msg in discordMessages)
             {
-                if (string.IsNullOrEmpty(quote.MessageID))
-                    continue;
-
                 attemptedInDiscord++;
 
-                var channelId = quote.ChannelID;
-                // If we don't have a cached ChannelID, try to discover it without saving
+                var channelId = msg.ChannelID;
                 if (string.IsNullOrEmpty(channelId))
                 {
-                    channelId = await DiscoverChannelForMessageNoSave(httpClient, id, quote.MessageID);
+                    channelId = await DiscoverChannelForMessageNoSave(httpClient, id, msg.MessageID);
                 }
 
                 if (string.IsNullOrEmpty(channelId))
@@ -770,23 +782,22 @@ namespace API.Controllers
 
                 try
                 {
-                    // First, try to delete the thread attached to this message (if any)
-                    // Discord creates threads with the same ID as the message they're attached to
+                    // Delete the thread attached to this message (if any)
                     try
                     {
                         var threadResponse = await httpClient.DeleteAsync(
-                            $"https://discord.com/api/v10/channels/{quote.MessageID}");
+                            $"https://discord.com/api/v10/channels/{msg.MessageID}");
                         if (threadResponse.IsSuccessStatusCode)
                             deletedThreads++;
                     }
                     catch (Exception ex)
                     {
-                        Log.Logger.Debug(ex, "No thread to delete for quote {QuoteId}", quote.ID);
+                        Log.Logger.Debug(ex, "No thread to delete for message {MessageId}", msg.MessageID);
                     }
 
-                    // Then delete the quote message itself
+                    // Delete the quote message itself
                     var response = await httpClient.DeleteAsync(
-                        $"https://discord.com/api/v10/channels/{channelId}/messages/{quote.MessageID}");
+                        $"https://discord.com/api/v10/channels/{channelId}/messages/{msg.MessageID}");
                     if (response.IsSuccessStatusCode)
                         deletedInDiscord++;
 
@@ -795,15 +806,9 @@ namespace API.Controllers
                 }
                 catch (Exception ex)
                 {
-                    Log.Logger.Warning(ex, "Failed to delete Discord message for quote {QuoteId}", quote.ID);
+                    Log.Logger.Warning(ex, "Failed to delete Discord message {MessageId}", msg.MessageID);
                 }
             }
-
-            // DB cleanup — always runs even if Discord calls failed
-            _db.Set<QuoteQuotee>().RemoveRange(relatedQuotees);
-            _db.Set<QuoteVote>().RemoveRange(relatedVotes);
-            _db.Quotes.RemoveRange(quotes);
-            await _db.SaveChangesAsync();
 
             return Ok(new
             {
