@@ -10,21 +10,28 @@ export interface RemoveBotResult {
 }
 
 export async function removeBotFromGuild(guild: Guild, session: Session): Promise<RemoveBotResult> {
-  const res = await fetch(`${BACKEND_HOST}/server/${guild.id}/bot`, {
-    method: 'DELETE',
-    headers: {
-      Authorization: `Bearer ${session.jwt}`
-    }
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BACKEND_HOST}/server/${guild.id}/bot`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${session.jwt}`
+      }
+    });
+  } catch (e) {
+    console.error(`[removeBotFromGuild] fetch threw for guild ${guild.id}:`, e);
+    return { success: false, error: 'Could not reach backend.' };
+  }
 
   if (!res.ok) {
-    let payload: RemoveBotResult = { success: false };
+    const raw = await res.text();
+    console.error(`[removeBotFromGuild] ${res.status} for guild ${guild.id}: ${raw}`);
+    let payload: RemoveBotResult = { success: false, error: 'Failed to remove bot' };
     try {
-      payload = await res.json();
+      payload = JSON.parse(raw);
     } catch {
-      payload = { success: false, error: 'Failed to remove bot' };
+      // raw body was not JSON
     }
-    console.error(`[removeBotFromGuild] ${res.status} for guild ${guild.id}:`, JSON.stringify(payload));
     return { ...payload, success: false };
   }
 

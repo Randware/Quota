@@ -21,12 +21,15 @@ export const actions: Actions = {
     }
 
     const guild = { id: params.slug } as Guild;
-    const result = await removeBotFromGuild(guild, session);
-
-    if (!result.success) {
-      return fail(400, { ...result });
+    try {
+      const result = await removeBotFromGuild(guild, session);
+      if (!result.success) {
+        return fail(400, { ...result });
+      }
+      return { ...result };
+    } catch (e) {
+      console.error('[removeBot action] unhandled error:', e);
+      return fail(500, { success: false, error: 'Unexpected server error.' });
     }
-
-    return { ...result };
   }
 };
