@@ -22,8 +22,9 @@
 				await invalidateAll();
 				return;
 			}
-			const error = result.data?.error ?? 'Failed to remove bot from server.';
-			errorMessage = error;
+			// result.type === 'failure' when the action called fail()
+			const data = result.type === 'failure' || result.type === 'success' ? result.data : null;
+			errorMessage = data?.error ?? 'Failed to remove bot from server.';
 			await invalidateAll();
 		};
 	};

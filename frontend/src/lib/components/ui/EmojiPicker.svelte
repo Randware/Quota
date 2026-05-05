@@ -17,16 +17,29 @@
 	let font: string = $state('');
 
 	function convertColor(cssColor: string): string {
-		const match = cssColor.match(/rgba?\(\s*([^)]+)\s*\)/i);
+		cssColor = cssColor.trim();
 
-		if (!match) {
-			throw new Error(`invalid color: "${cssColor}"`);
+		// Already rgb/rgba — extract the inner values
+		const rgbMatch = cssColor.match(/rgba?\(\s*([^)]+)\s*\)/i);
+		if (rgbMatch) {
+			return rgbMatch[1]
+				.split(',')
+				.map((s) => s.trim())
+				.join(',');
 		}
 
-		return match[1]
-			.split(',')
-			.map((s) => s.trim())
-			.join(',');
+		// Hex color (#rrggbb or #rgb) — convert to r,g,b
+		const hexMatch = cssColor.match(/^#([0-9a-f]{3,8})$/i);
+		if (hexMatch) {
+			let hex = hexMatch[1];
+			if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+			const r = parseInt(hex.slice(0, 2), 16);
+			const g = parseInt(hex.slice(2, 4), 16);
+			const b = parseInt(hex.slice(4, 6), 16);
+			return `${r},${g},${b}`;
+		}
+
+		throw new Error(`invalid color: "${cssColor}"`);
 	}
 
 	onMount(() => {
