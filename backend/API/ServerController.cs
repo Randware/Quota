@@ -738,9 +738,11 @@ namespace API.Controllers
 
             const long ManageGuild = 0x20;
             const long Administrator = 0x8;
-            // Discord returns permissions as a string in the guilds endpoint
-            var permStr = guildElement.GetProperty("permissions").GetString() ?? "0";
-            var permissions = long.TryParse(permStr, out var p) ? p : 0L;
+            // Discord may return permissions as a string or number depending on API version
+            var permEl = guildElement.GetProperty("permissions");
+            var permissions = permEl.ValueKind == System.Text.Json.JsonValueKind.Number
+                ? permEl.GetInt64()
+                : long.TryParse(permEl.GetString(), out var p) ? p : 0L;
             var hasManage = (permissions & ManageGuild) != 0 || (permissions & Administrator) != 0;
 
             if (!hasManage)
