@@ -21,6 +21,7 @@
 			isRemoving = false;
 			if (result.type === 'success' && result.data?.success) {
 				errorMessage = '';
+				await invalidateAll();
 				await goto('/dashboard');
 				return;
 			}
@@ -67,13 +68,12 @@
 			<div class="text-light px-4 py-2 font-semibold">Switch</div>
 		</ButtonPrimary>
 
-		<form bind:this={formEl} method="POST" action="?/removeBot" use:enhance={handleRemove}>
-			<ButtonDark onclick={openConfirm} disabled={isRemoving} type="button">
-				<div class="text-light px-4 py-2 font-semibold">
-					{isRemoving ? 'Removing…' : 'Remove Quota'}
-				</div>
-			</ButtonDark>
-		</form>
+		<ButtonDark onclick={openConfirm} disabled={isRemoving} type="button">
+			<div class="text-light px-4 py-2 font-semibold">
+				{isRemoving ? 'Removing…' : 'Remove Quota'}
+			</div>
+		</ButtonDark>
+		<form bind:this={formEl} method="POST" action="?/removeBot" use:enhance={handleRemove} />
 	</div>
 </div>
 
