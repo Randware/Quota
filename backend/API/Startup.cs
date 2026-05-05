@@ -13,6 +13,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Events;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Http;
 
 namespace API;
 
@@ -40,6 +43,18 @@ public class Startup
         public string Secret { get; set; }
         public string ApiEndpoint { get; set; } = "https://discord.com/api/v10";
         public string BotToken { get; set; }
+    }
+
+    public class RateLimitConfig
+    {
+        /// <summary>Max requests per window for general endpoints (default: 60)</summary>
+        public int GeneralPermitLimit { get; set; } = 60;
+        /// <summary>Window in seconds for general endpoints (default: 60)</summary>
+        public int GeneralWindowSeconds { get; set; } = 60;
+        /// <summary>Max requests per window for auth endpoints (default: 10)</summary>
+        public int AuthPermitLimit { get; set; } = 10;
+        /// <summary>Window in seconds for auth endpoints (default: 60)</summary>
+        public int AuthWindowSeconds { get; set; } = 60;
     }
 
     public void ConfigureServices(IServiceCollection services)
@@ -86,9 +101,76 @@ public class Startup
                     ApiEndpoint = oauthSection.ContainsKey("apiEndpoint") ? oauthSection["apiEndpoint"] as string : "https://discord.com/api/v10",
                     BotToken = botSection["token"] as string,
                 };
+
+                // Parse rate limit config (optional section)
+                var rateLimitSection = toml.ContainsKey("ratelimit") ? toml["ratelimit"] as TomlTable : null;
+                var rateLimitConfig = new RateLimitConfig();
+                if (rateLimitSection != null)
+                {
+                    if (rateLimitSection.ContainsKey("generalPermitLimit"))
+                        rateLimitConfig.GeneralPermitLimit = Convert.ToInt32(rateLimitSection["generalPermitLimit"]);
+                    if (rateLimitSection.ContainsKey("generalWindowSeconds"))
+                        rateLimitConfig.GeneralWindowSeconds = Convert.ToInt32(rateLimitSection["generalWindowSeconds"]);
+                    if (rateLimitSection.ContainsKey("authPermitLimit"))
+                        rateLimitConfig.AuthPermitLimit = Convert.ToInt32(rateLimitSection["authPermitLimit"]);
+                    if (rateLimitSection.ContainsKey("authWindowSeconds"))
+                        rateLimitConfig.AuthWindowSeconds = Convert.ToInt32(rateLimitSection["authWindowSeconds"]);
+                }
+
                 // Register config objects
                 services.AddSingleton(jwtConfig);
                 services.AddSingleton(oauthConfig);
+                services.AddSingleton(rateLimitConfig);
+
+                // Add rate limiting
+                services.AddRateLimiter(options =>
+                {
+                    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+                    // General policy: applies to most endpoints
+                    options.AddFixedWindowLimiter("general", opt =>
+                    {
+                        opt.PermitLimit = rateLimitConfig.GeneralPermitLimit;
+                        opt.Window = TimeSpan.FromSeconds(rateLimitConfig.GeneralWindowSeconds);
+                        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                        opt.QueueLimit = 0;
+                    });
+
+                    // Strict policy: auth endpoints (login, refresh, revoke)
+                    options.AddFixedWindowLimiter("auth", opt =>
+                    {
+                        opt.PermitLimit = rateLimitConfig.AuthPermitLimit;
+                        opt.Window = TimeSpan.FromSeconds(rateLimitConfig.AuthWindowSeconds);
+                        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                        opt.QueueLimit = 0;
+                    });
+
+                    // Partition by remote IP
+                    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+                    {
+                        var remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                        return RateLimitPartition.GetFixedWindowLimiter(remoteIp, _ =>
+                            new FixedWindowRateLimiterOptions
+                            {
+                                PermitLimit = rateLimitConfig.GeneralPermitLimit,
+                                Window = TimeSpan.FromSeconds(rateLimitConfig.GeneralWindowSeconds)
+                            });
+                    });
+
+                    options.OnRejected = async (context, cancellationToken) =>
+                    {
+                        context.HttpContext.Response.ContentType = "application/json";
+                        await context.HttpContext.Response.WriteAsync(
+                            "{\"error\": \"Too many requests. Please try again later.\"}",
+                            cancellationToken);
+                    };
+
+                    Log.Logger.Information(
+                        "Rate limiting configured: general={GeneralLimit}/{GeneralWindow}s, auth={AuthLimit}/{AuthWindow}s",
+                        rateLimitConfig.GeneralPermitLimit, rateLimitConfig.GeneralWindowSeconds,
+                        rateLimitConfig.AuthPermitLimit, rateLimitConfig.AuthWindowSeconds);
+                });
+
                 // Add controllers
                 services.AddControllers();
                 services.AddScoped<Storage>();
@@ -294,6 +376,7 @@ public class Startup
                 }
 
                 app.UseRouting();
+                app.UseRateLimiter();
                 app.UseAuthentication(); 
                 app.UseAuthorization();
                 app.UseEndpoints(endpoints =>

@@ -103,6 +103,13 @@ refreshButtonsHours = 24
 [openapi]
 enabled = true
 
+# Rate limiting (optional — sensible defaults are used if omitted)
+[ratelimit]
+generalPermitLimit = 60     # Max requests per window for general endpoints
+generalWindowSeconds = 60   # Window size in seconds for general endpoints
+authPermitLimit = 10        # Max requests per window for auth endpoints
+authWindowSeconds = 60      # Window size in seconds for auth endpoints
+
 [server]
 port = 5000
 ```

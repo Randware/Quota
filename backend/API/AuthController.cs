@@ -5,6 +5,7 @@ using OAuth = Common.OAuth;
 using System.ComponentModel.DataAnnotations;
 using Common;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace API;
 
@@ -14,6 +15,7 @@ namespace API;
 [ApiController]
 [Route("auth")]
 [AllowAnonymous]
+[EnableRateLimiting("auth")]
 public class AuthController : ControllerBase
 {
     private readonly Storage _storage;
@@ -127,7 +129,6 @@ public class AuthController : ControllerBase
     /// <param name="request">The revoke request containing the refresh token.</param>
     /// <returns>Success or not found.</returns>
     [HttpPost("revoke")]
-    [AllowAnonymous]
     public async Task<IActionResult> Revoke([FromBody] RevokeRequest request)
     {
         var result = await _storage.RevokeSessionByRefreshTokenAsync(request.RefreshToken);
@@ -142,7 +143,6 @@ public class AuthController : ControllerBase
     /// <param name="request">The revoke all request containing a valid refresh token.</param>
     /// <returns>The number of sessions revoked.</returns>
     [HttpPost("revoke-all")]
-    [AllowAnonymous]
     public async Task<IActionResult> RevokeAll([FromBody] RevokeAllRequest request)
     {
         var session = await _storage.GetSessionByRefreshTokenAsync(request.RefreshToken);
