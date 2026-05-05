@@ -10,7 +10,7 @@ export const load: LayoutServerLoad = async ({ params, parent, locals }) => {
 
   const guild: Guild | undefined = (await userGuilds).find(guild => guild.id === guildId);
 
-  if (!guild) {
+  if (!guild || !guild.bot) {
     throw redirect(303, '/dashboard');
   }
 

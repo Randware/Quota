@@ -707,6 +707,78 @@ namespace API.Controllers
         }
 
         /// <summary>
+        /// Deletes all quotes for this guild from both Discord and the database.
+        /// </summary>
+        [HttpDelete("quotes")]
+        [Authorize]
+        public async Task<IActionResult> DeleteAllQuotes([FromRoute] string id)
+        {
+            var jwtUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+            if (string.IsNullOrEmpty(jwtUserId))
+                return Unauthorized("Missing user id in token");
+
+            var allowedGuilds = User.FindFirst("allowed_guilds")?.Value;
+            if (allowedGuilds == null || !allowedGuilds.Split(',').Contains(id))
+                return Unauthorized("You do not have access to this guild.");
+
+            var dbGuild = await _db.Guilds.FirstOrDefaultAsync(g => g.DiscordID == id);
+            if (dbGuild == null)
+                return NotFound("Guild not found");
+
+            var quotes = await _db.Quotes
+                .Where(q => q.GuildID == dbGuild.ID)
+                .ToListAsync();
+
+            var quoteIds = quotes.Select(q => q.ID).ToList();
+            var relatedQuotees = _db.Set<QuoteQuotee>().Where(qq => quoteIds.Contains(qq.QuoteID));
+            var relatedVotes = _db.Set<QuoteVote>().Where(qv => quoteIds.Contains(qv.QuoteID));
+
+            var deletedInDiscord = 0;
+            var attemptedInDiscord = 0;
+
+            foreach (var quote in quotes)
+            {
+                if (string.IsNullOrEmpty(quote.MessageID))
+                    continue;
+
+                attemptedInDiscord++;
+
+                var channelId = await DiscoverChannelForMessage(id, quote.MessageID, quote);
+                if (string.IsNullOrEmpty(channelId))
+                    continue;
+
+                try
+                {
+                    using var httpClient = new HttpClient();
+                    httpClient.DefaultRequestHeaders.Authorization =
+                        new System.Net.Http.Headers.AuthenticationHeaderValue("Bot", _discordClient.BotToken);
+                    var response = await httpClient.DeleteAsync(
+                        $"https://discord.com/api/v10/channels/{channelId}/messages/{quote.MessageID}");
+                    if (response.IsSuccessStatusCode)
+                        deletedInDiscord++;
+                }
+                catch (Exception ex)
+                {
+                    Log.Logger.Warning(ex, "Failed to delete Discord message for quote {QuoteId}", quote.ID);
+                }
+            }
+
+            _db.Set<QuoteQuotee>().RemoveRange(relatedQuotees);
+            _db.Set<QuoteVote>().RemoveRange(relatedVotes);
+            _db.Quotes.RemoveRange(quotes);
+            await _db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                success = true,
+                deletedQuotes = quotes.Count,
+                attemptedDiscordDeletes = attemptedInDiscord,
+                deletedDiscordMessages = deletedInDiscord
+            });
+        }
+
+        /// <summary>
         /// Removes the bot from a guild if the requesting user still has permission.
         /// </summary>
         [HttpDelete("bot")]

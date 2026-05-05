@@ -89,3 +89,22 @@ export async function deleteQuote(
 
     return await res.json();
 }
+
+export async function deleteAllQuotes(
+    guild: Guild,
+    session: Session
+): Promise<{ success: boolean; deletedQuotes: number; attemptedDiscordDeletes: number; deletedDiscordMessages: number }>
+{
+    const res = await fetch(`${BACKEND_HOST}/server/${guild.id}/quotes`, {
+        method: 'DELETE',
+        headers: {
+            Authorization: `Bearer ${session.jwt}`,
+        },
+    });
+
+    if (!res.ok) {
+        return { success: false, deletedQuotes: 0, attemptedDiscordDeletes: 0, deletedDiscordMessages: 0 };
+    }
+
+    return await res.json();
+}

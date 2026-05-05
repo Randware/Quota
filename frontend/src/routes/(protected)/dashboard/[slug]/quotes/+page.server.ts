@@ -1,6 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import type { Guild } from '$lib/server/types';
-import { getGuildQuotes, editQuote, deleteQuote } from '$lib/server/quotes';
+import { getGuildQuotes, editQuote, deleteQuote, deleteAllQuotes } from '$lib/server/quotes';
+import { fail } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ parent, locals, url }) => {
     const { guild }: { guild: Guild } = await parent();
@@ -50,5 +51,19 @@ export const actions: Actions = {
         const result = await deleteQuote(guild, session, quoteId);
 
         return { ...result, action: 'delete' };
+    },
+
+    resetQuotes: async ({ locals, params }) => {
+        const session = locals.session;
+        if (!session) return fail(401, { success: false, error: 'Not authenticated' });
+
+        const guild = { id: params.slug } as any;
+        const result = await deleteAllQuotes(guild, session);
+
+        if (!result.success) {
+            return fail(500, { success: false, error: 'Failed to delete all quotes.' });
+        }
+
+        return { ...result, action: 'resetQuotes' };
     },
 };

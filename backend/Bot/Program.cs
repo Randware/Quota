@@ -12,8 +12,9 @@ public class Program
     private readonly IServiceProvider _serviceProvider;
     private readonly QuotaBot _bot;
     private readonly string _token;
+    private readonly int _refreshButtonsHours;
 
-    public Program(string token)
+    public Program(string token, int refreshButtonsHours)
     {
         // Set up services
         var services = new ServiceCollection();
@@ -29,18 +30,19 @@ public class Program
         _serviceProvider = services.BuildServiceProvider();
 
         // Initialize bot with the service provider
-        _bot = new QuotaBot(_serviceProvider);
+        _bot = new QuotaBot(_serviceProvider, refreshButtonsHours);
         _token = token;
+        _refreshButtonsHours = refreshButtonsHours;
     }
 
-    public static async Task RunAsync(string token)
+    public static async Task RunAsync(string token, int refreshButtonsHours)
     {
         try
         {
             using (LogContext.PushProperty("SourceContext", "Bot.Startup"))
             {
                 Log.Logger.Information("Starting Discord bot...");
-                var program = new Program(token);
+                var program = new Program(token, refreshButtonsHours);
                 await program._bot.StartAsync(token);
                 Log.Logger.Information("Discord bot is running");
             }

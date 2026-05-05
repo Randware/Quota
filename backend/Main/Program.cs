@@ -46,6 +46,10 @@ public class Program
                 // Get bot token
                 var botSection = toml["bot"] as TomlTable ?? throw new Exception("Missing [bot] section in config.toml");
                 var token = botSection["token"] as string ?? throw new Exception("Missing 'token' in [bot] section of config.toml");
+                var refreshButtonsHours = botSection.ContainsKey("refreshButtonsHours")
+                    ? Convert.ToInt32(botSection["refreshButtonsHours"])
+                    : 24;
+                if (refreshButtonsHours < 1) refreshButtonsHours = 1;
 
                 _cancellationTokenSource = new CancellationTokenSource();
 
@@ -53,7 +57,7 @@ public class Program
                 var tasks = new List<Task>
                 {
                     Task.Run(() => API.Program.StartAsync(args), _cancellationTokenSource.Token),
-                    Task.Run(() => Bot.Program.RunAsync(token), _cancellationTokenSource.Token)
+                    Task.Run(() => Bot.Program.RunAsync(token, refreshButtonsHours), _cancellationTokenSource.Token)
                 };
 
                 // Handle shutdown gracefully

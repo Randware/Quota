@@ -17,12 +17,13 @@ public class QuotaBot
     private readonly InteractionService _interactions;
     private readonly IServiceProvider _services;
     private readonly Storage _storage;
+    private readonly TimeSpan _refreshButtonsWindow;
     private bool _isReady = false;
 
     // Static accessor for the running DiscordSocketClient
     public static DiscordSocketClient? ClientInstance { get; private set; }
 
-    public QuotaBot(IServiceProvider services)
+    public QuotaBot(IServiceProvider services, int refreshButtonsHours = 24)
     {
         var config = new DiscordSocketConfig
         {
@@ -36,6 +37,7 @@ public class QuotaBot
         _interactions = new InteractionService(_client);
         _services = services;
         _storage = _services.GetRequiredService<Storage>();
+        _refreshButtonsWindow = TimeSpan.FromHours(Math.Max(1, refreshButtonsHours));
 
         // Set up logging
         _client.Log += LogDiscordMessage;
@@ -266,7 +268,7 @@ public class QuotaBot
                 var storage = scope.ServiceProvider.GetRequiredService<Storage>();
                 
                 // Get quotes from the last 24 hours that might still have active buttons
-                var recentQuotes = await GetRecentQuotesWithMessageIds(storage, TimeSpan.FromHours(24));
+                var recentQuotes = await GetRecentQuotesWithMessageIds(storage, _refreshButtonsWindow);
                 var refreshCount = 0;
                 
                 foreach (var quote in recentQuotes)

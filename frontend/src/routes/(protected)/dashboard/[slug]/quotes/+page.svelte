@@ -17,6 +17,8 @@
 		X,
 		AlertTriangle
 	} from 'lucide-svelte';
+	import ButtonPrimary from '$lib/components/ui/ButtonPrimary.svelte';
+	import ButtonDark from '$lib/components/ui/ButtonDark.svelte';
 	import type { ActionResult, SubmitFunction } from '@sveltejs/kit';
 	import type { QuoteItem } from '$lib/server/quotes';
 
@@ -35,6 +37,8 @@
 
 	// Delete confirmation state
 	let deletingQuoteId = $state<string | null>(null);
+	let isResetConfirming = $state(false);
+	let isResetting = $state(false);
 
 	// Toast notification
 	let toast = $state<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
@@ -126,6 +130,33 @@
 		};
 	};
 
+	const handleResetQuotes: SubmitFunction = () => {
+		isResetting = true;
+		return async ({ result }: { result: ActionResult }) => {
+			isResetting = false;
+			if (result.type === 'success' && result.data?.success) {
+				isResetConfirming = false;
+				showToast('All quotes deleted and Discord messages removed.', 'success');
+				await invalidateAll();
+			} else {
+				showToast('Failed to delete all quotes', 'error');
+			}
+		};
+	};
+
+	function openResetConfirm() {
+		isResetConfirming = true;
+	}
+
+	function cancelResetConfirm() {
+		isResetConfirming = false;
+	}
+
+	function confirmReset() {
+		const form = document.getElementById('reset-quotes-form') as HTMLFormElement | null;
+		form?.requestSubmit();
+	}
+
 	function formatDate(dateStr: string | null): string {
 		if (!dateStr) return '—';
 		return new Date(dateStr).toLocaleDateString('en-US', {
@@ -149,7 +180,12 @@
 					</span>
 				{/if}
 			</div>
+			<ButtonDark onclick={openResetConfirm} type="button">
+				<div class="text-light px-4 py-2 text-sm font-semibold">Reset Quotes</div>
+			</ButtonDark>
 		</div>
+
+		<form id="reset-quotes-form" method="POST" action="?/resetQuotes" use:enhance={handleResetQuotes} />
 
 		<!-- Search bar -->
 		<div in:fly={{ y: 20, duration: 400, delay: 100 }} class="relative">
@@ -356,6 +392,30 @@
 				</button>
 			</div>
 		{/if}
+	</div>
+{/if}
+
+{#if isResetConfirming}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+		<div class="bg-dark ring-highlight w-full max-w-md rounded-xl p-6 ring-2">
+			<div class="text-light text-lg font-semibold">Delete all quotes?</div>
+			<div class="text-light/70 mt-2 text-sm">
+				This will permanently delete all quotes for this server from Discord and the database.
+			</div>
+			<div class="text-red-400 mt-3 text-sm font-semibold">
+				This action is irreversible. Your data will be permanently deleted.
+			</div>
+			<div class="mt-6 flex justify-end gap-3">
+				<ButtonDark onclick={cancelResetConfirm} disabled={isResetting} type="button">
+					<div class="text-light px-4 py-2 font-semibold">Cancel</div>
+				</ButtonDark>
+				<ButtonPrimary onclick={confirmReset} disabled={isResetting} type="button">
+					<div class="text-light px-4 py-2 font-semibold">
+						{isResetting ? 'Deleting…' : 'Delete All'}
+					</div>
+				</ButtonPrimary>
+			</div>
+		</div>
 	</div>
 {/if}
 

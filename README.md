@@ -40,6 +40,8 @@ Notes:
 
 - `oauth.id` and `oauth.secret` are your Discord Application Client ID/Secret.
 - `bot.token` is your Discord bot token.
+- `bot.refreshButtonsHours` controls how many hours of recent quotes get their
+  vote buttons refreshed on bot startup (default: 24).
 - `jwt.secret` can be any long random string.
 - `server.port` defaults to `5000` (update if you want a different port).
 
@@ -63,6 +65,7 @@ apiEndpoint = "https://discord.com/api/v10"
 
 [bot]
 token = "<discord bot token>"
+refreshButtonsHours = 24
 
 [openapi]
 enabled = false
@@ -95,6 +98,7 @@ apiEndpoint = "https://discord.com/api/v10"
 
 [bot]
 token = "your_bot_token"
+refreshButtonsHours = 24
 
 [openapi]
 enabled = true
