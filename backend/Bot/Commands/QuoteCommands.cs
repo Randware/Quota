@@ -344,8 +344,7 @@ public class QuoteCommands : InteractionModuleBase<SocketInteractionContext>
                 var user = await _storage.GetUserByDiscordIdAsync(Context.User.Id.ToString());
                 if (user == null)
                 {
-                    await RespondAsync("User not found.", ephemeral: true);
-                    return;
+                    user = await _storage.CreateUserAsync(Context.User.Id.ToString());
                 }
 
                 // Get the user's previous vote if any
