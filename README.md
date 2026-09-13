@@ -6,6 +6,8 @@
 
 Quota is a Discord quote bot with a web dashboard for managing, browsing, and celebrating the best moments in your server. Save quotes with slash commands, let your community vote, and track the greatest hits without leaving Discord.
 
+> **Want to test it first?** Explore the live dashboard or invite the public bot instance at **[quota.randware.org](https://quota.randware.org)**.
+
 ## Why Quota
 
 - Designed for real communities: collect quotes fast and keep them organized.
