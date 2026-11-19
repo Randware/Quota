@@ -1,5 +1,5 @@
 import type { Guild, Session } from '$lib/server/types';
-import { BACKEND_HOST } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 export interface RemoveBotResult {
   success: boolean;
@@ -12,7 +12,7 @@ export interface RemoveBotResult {
 export async function removeBotFromGuild(guild: Guild, session: Session): Promise<RemoveBotResult> {
   let res: Response;
   try {
-    res = await fetch(`${BACKEND_HOST}/server/${guild.id}/bot`, {
+    res = await fetch(`${env.BACKEND_HOST}/server/${guild.id}/bot`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${session.jwt}`

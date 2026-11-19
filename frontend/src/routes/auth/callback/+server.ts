@@ -1,5 +1,5 @@
 import { dev } from "$app/environment";
-import { DISCORD_REDIRECT_URI } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 import { createSession, refreshSession } from "$lib/server/auth";
 import type { Session } from "$lib/server/types";
 import { redirect, type RequestHandler } from "@sveltejs/kit";
@@ -39,7 +39,7 @@ export const GET: RequestHandler = async ({ url, cookies, locals }) => {
 
   cookies.delete('state', { path: '/' });
 
-  const session: Session = await createSession(code, DISCORD_REDIRECT_URI);
+  const session: Session = await createSession(code, env.DISCORD_REDIRECT_URI ?? '');
 
   cookies.set('session', JSON.stringify(session), {
     path: '/',

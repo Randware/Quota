@@ -1,5 +1,5 @@
 import type { Channel, Guild, ImageEmoji, Session, Settings, TextEmoji } from "./types";
-import { BACKEND_HOST } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 
 const DEFAULT_SETTINGS: Settings = {
   allowedChannels: [],
@@ -58,7 +58,7 @@ export async function updateGuildSettings(guild: Guild, newSettings: Settings, s
     allowedChannels: newSettings.allowedChannels.map(ch => ch.id),
   };
 
-  await fetch(`${BACKEND_HOST}/server/${guild.id}/config`, {
+  await fetch(`${env.BACKEND_HOST}/server/${guild.id}/config`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -69,7 +69,7 @@ export async function updateGuildSettings(guild: Guild, newSettings: Settings, s
 }
 
 export async function getGuildSettings(guild: Guild, session: Session): Promise<Settings> {
-  const res = await fetch(`${BACKEND_HOST}/server/${guild.id}/config`, {
+  const res = await fetch(`${env.BACKEND_HOST}/server/${guild.id}/config`, {
     headers: {
       "Authorization": `Bearer ${session.jwt}`
     }
@@ -101,7 +101,7 @@ export async function getGuildSettings(guild: Guild, session: Session): Promise<
 }
 
 export async function getGuildChannels(guild: Guild, session: Session): Promise<Channel[]> {
-  const res = await fetch(`${BACKEND_HOST}/server/${guild.id}/channels`, {
+  const res = await fetch(`${env.BACKEND_HOST}/server/${guild.id}/channels`, {
     headers: {
       "Authorization": `Bearer ${session.jwt}`
     }

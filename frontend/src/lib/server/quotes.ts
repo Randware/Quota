@@ -1,5 +1,5 @@
 import type { Guild, Session } from '$lib/server/types';
-import { BACKEND_HOST } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 export interface QuoteItem {
     id: string;
@@ -35,7 +35,7 @@ export async function getGuildQuotes(
     });
     if (search) params.set('search', search);
 
-    const res = await fetch(`${BACKEND_HOST}/server/${guild.id}/quotes?${params}`, {
+    const res = await fetch(`${env.BACKEND_HOST}/server/${guild.id}/quotes?${params}`, {
         headers: {
             Authorization: `Bearer ${session.jwt}`,
         },
@@ -55,7 +55,7 @@ export async function editQuote(
     content: string,
     quotees: string[]
 ): Promise<{ success: boolean; discordUpdated: boolean }> {
-    const res = await fetch(`${BACKEND_HOST}/server/${guild.id}/quote/${quoteId}`, {
+    const res = await fetch(`${env.BACKEND_HOST}/server/${guild.id}/quote/${quoteId}`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
@@ -76,7 +76,7 @@ export async function deleteQuote(
     session: Session,
     quoteId: string
 ): Promise<{ success: boolean; discordDeleted: boolean }> {
-    const res = await fetch(`${BACKEND_HOST}/server/${guild.id}/quote/${quoteId}`, {
+    const res = await fetch(`${env.BACKEND_HOST}/server/${guild.id}/quote/${quoteId}`, {
         method: 'DELETE',
         headers: {
             Authorization: `Bearer ${session.jwt}`,
@@ -95,7 +95,7 @@ export async function deleteAllQuotes(
     session: Session
 ): Promise<{ success: boolean; deletedQuotes: number; attemptedDiscordDeletes: number; deletedDiscordMessages: number }>
 {
-    const res = await fetch(`${BACKEND_HOST}/server/${guild.id}/quotes`, {
+    const res = await fetch(`${env.BACKEND_HOST}/server/${guild.id}/quotes`, {
         method: 'DELETE',
         headers: {
             Authorization: `Bearer ${session.jwt}`,

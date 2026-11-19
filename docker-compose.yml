@@ -16,10 +16,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
-        DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}
-        BACKEND_HOST: ${BACKEND_HOST}
     environment:
       - NODE_ENV=production
       - ORIGIN=${PUBLIC_ORIGIN:-http://localhost:8080}

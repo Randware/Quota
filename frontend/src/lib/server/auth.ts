@@ -1,12 +1,12 @@
 import { jwtDecode } from "jwt-decode";
 import type { Guild, Session } from "./types";
-import { BACKEND_HOST } from "$env/static/private";
+import { env } from "$env/dynamic/private";
 
 const REFRESH_BUFFER: number = 10_000;
 
 // Authorizes a new user
 export async function createSession(code: string, redirectURI: string): Promise<Session> {
-  let tokensRes = await fetch(`${BACKEND_HOST}/auth/login`, {
+  let tokensRes = await fetch(`${env.BACKEND_HOST}/auth/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -22,7 +22,7 @@ export async function createSession(code: string, redirectURI: string): Promise<
 
   let userID = jwtDecode(jwt).sub;
 
-  let userRes = await fetch(`${BACKEND_HOST}/user/${userID}/info`, {
+  let userRes = await fetch(`${env.BACKEND_HOST}/user/${userID}/info`, {
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${jwt}`
@@ -44,7 +44,7 @@ export async function getUserGuilds(session: Session): Promise<Guild[]> {
   if (!userID) return [];
 
   // Fetch user's Discord guilds
-  const guildsRes = await fetch(`${BACKEND_HOST}/user/${userID}/guilds`, {
+  const guildsRes = await fetch(`${env.BACKEND_HOST}/user/${userID}/guilds`, {
     headers: {
       "Authorization": `Bearer ${session.jwt}`
     }
@@ -63,7 +63,7 @@ export async function getUserGuilds(session: Session): Promise<Guild[]> {
   );
 
   // Check which of these guilds the bot is in
-  const checkRes = await fetch(`${BACKEND_HOST}/user/${userID}/check-guilds`, {
+  const checkRes = await fetch(`${env.BACKEND_HOST}/user/${userID}/check-guilds`, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${session.jwt}`,
@@ -91,7 +91,7 @@ export async function getUserGuilds(session: Session): Promise<Guild[]> {
 }
 
 export async function getBotPermissions(): Promise<number> {
-  const res = await fetch(`${BACKEND_HOST}/bot/invite`);
+  const res = await fetch(`${env.BACKEND_HOST}/bot/invite`);
 
   if (!res.ok) return 0;
 
@@ -117,7 +117,7 @@ export async function isJWTExpired(jwt: string) {
 
 export async function refreshSession(session: Session, force: boolean = false): Promise<Session> {
   if (force || await isJWTExpired(session.jwt)) {
-    let refreshRes = await fetch(`${BACKEND_HOST}/auth/refresh`, {
+    let refreshRes = await fetch(`${env.BACKEND_HOST}/auth/refresh`, {
       body: JSON.stringify({ refreshToken: session.token }),
       method: "POST",
       headers: {
@@ -133,7 +133,7 @@ export async function refreshSession(session: Session, force: boolean = false): 
 
     let userID = jwtDecode(jwt).sub;
 
-    let userRes = await fetch(`${BACKEND_HOST}/user/${userID}/info`, {
+    let userRes = await fetch(`${env.BACKEND_HOST}/user/${userID}/info`, {
       headers: {
         "Authorization": `Bearer ${jwt}`
       }
@@ -153,7 +153,7 @@ export async function refreshSession(session: Session, force: boolean = false): 
 }
 
 export async function revokeSession(session: Session): Promise<void> {
-  await fetch(`${BACKEND_HOST}/auth/revoke`, {
+  await fetch(`${env.BACKEND_HOST}/auth/revoke`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"

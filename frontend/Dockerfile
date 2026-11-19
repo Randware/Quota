@@ -1,13 +1,5 @@
-FROM node:20-alpine AS build
+FROM node:24.22.3-alpine AS build
 WORKDIR /app
-
-ARG DISCORD_CLIENT_ID
-ARG DISCORD_REDIRECT_URI
-ARG BACKEND_HOST
-
-ENV DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
-ENV DISCORD_REDIRECT_URI=${DISCORD_REDIRECT_URI}
-ENV BACKEND_HOST=${BACKEND_HOST}
 
 COPY package.json pnpm-lock.yaml ./
 RUN corepack enable && corepack prepare pnpm@9.12.1 --activate && pnpm install --frozen-lockfile
@@ -15,7 +7,7 @@ RUN corepack enable && corepack prepare pnpm@9.12.1 --activate && pnpm install -
 COPY . .
 RUN pnpm build
 
-FROM node:20-alpine
+FROM node:24.22.3-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 

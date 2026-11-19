@@ -1,11 +1,11 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.404 AS build
 WORKDIR /src
 
 COPY . .
 RUN dotnet restore "Main/Main.csproj"
 RUN dotnet publish "Main/Main.csproj" -c Release -o /app/publish
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.15
 WORKDIR /app
 COPY --from=build /app/publish .
 

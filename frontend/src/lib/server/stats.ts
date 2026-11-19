@@ -1,9 +1,9 @@
 import type { Guild, Session, Stats } from '$lib/server/types';
-import { BACKEND_HOST } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 
 export async function getGuildStats(guild: Guild, session: Session): Promise<Stats> {
   try {
-    const res = await fetch(`${BACKEND_HOST}/server/${guild.id}/stats`, {
+    const res = await fetch(`${env.BACKEND_HOST}/server/${guild.id}/stats`, {
       headers: {
         "Authorization": `Bearer ${session.jwt}`
       }
